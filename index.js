@@ -9,11 +9,9 @@ const port = 3001;
 app.use(express.json());
 
 
-
-
-app.use("/user", UserRouter);
-app.use("/course", CourseRouter);
-app.use("/admin", adminRouter);
+app.use("/api/v1/user", UserRouter);
+app.use("/api/v1/course", CourseRouter);
+app.use("/api/v1/admin", adminRouter);
 
 
 app.listen(port, () => {

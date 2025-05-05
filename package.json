@@ -18,6 +18,7 @@
   "homepage": "https://github.com/Jayant9917/coursify#readme",
   "description": "",
   "dependencies": {
-    "express": "^4.17.0"
+    "express": "^4.17.0",
+    "mongoose": "^8.14.1"
   }
 }
