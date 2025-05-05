@@ -5,12 +5,19 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jayant9917/coursify.git"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Jayant9917/coursify/issues"
+  },
+  "homepage": "https://github.com/Jayant9917/coursify#readme",
   "description": "",
   "dependencies": {
-    "express": "^5.1.0",
-    "mongoose": "^8.14.1"
+    "express": "^4.17.0"
   }
 }

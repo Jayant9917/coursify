@@ -1,35 +1,30 @@
-// Other way for router
-//const { Router } = require("express");
+// const express = require("express");
+// const UserRouter = express.Router();
 
-const express = require("express");
-const  Router  = express.Router();
-
+const{ Router } = require("express");
 const UserRouter = Router();
 
-//SignUp Route
-UserRouter.post("/Signup", (req, res) => {
-        res.json({
-            msg : "you are sign Up"
-
-    })
+// SignUp Route
+UserRouter.post("/signup", (req, res) => {
+    res.json({
+        msg: "You are signed up"
+    });
 });
 
 // SignIn Route
-UserRouter.post("/SignIn", (req, res) => {
-        res.json({
-            msg : "you are sign In"
-
-    })
+UserRouter.post("/signin", (req, res) => {
+    res.json({
+        msg: "You are signed in"
+    });
 });
 
-// Gat all purchases
+// Get all purchases
 UserRouter.get("/purchases", (req, res) => {
-        res.json({
-            msg : "Your all courses"
-    })
-})
+    res.json({
+        msg: "Your purchased courses"
+    });
+});
 
 module.exports = {
-    UserRouter : UserRouter
+    UserRouter
 };
-
