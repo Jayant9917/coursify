@@ -1,12 +1,12 @@
 const express = require("express");
 const mongoose = require("mongoose");
+
 const { UserRouter } = require("./routers/user"); // Routing in express
 const { CourseRouter } = require("./routers/course");
 const { adminRouter } = require("./routers/admin");
 
 const app = express();
 const port = 3001;
-
 app.use(express.json());
 
 

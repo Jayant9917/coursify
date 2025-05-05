@@ -19,19 +19,19 @@ adminRouter.post("/signin", (req, res) => {
     });
 });
 
-adminRouter.post("/course", (req, res) => {
+adminRouter.post("/", (req, res) => {
     res.json({
         msg: "You are signed in"
     });
 });
 
-adminRouter.put("/course", (req, res) => {
+adminRouter.put("/", (req, res) => {
     res.json({
         msg: "You are signed in"
     });
 });
 
-adminRouter.get("/course/bulk", (req, res) => {
+adminRouter.get("/bulk", (req, res) => {
     res.json({
         msg: "You are signed in"
     });
