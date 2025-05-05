@@ -1,8 +1,5 @@
 const mongoose = require("mongoose");
 
-mongoose.connect("mongodb+srv://admin:jayant132465rana@cluster0.cty7ree.mongodb.net/coursify-app")
-    .then(() => console.log("Connected to MongoDB"))
-    .catch((err) => console.error("MongoDB connection error:", err));
 
 const Schema = mongoose.Schema;
 const ObjectId = Schema.ObjectId;
@@ -30,9 +27,9 @@ const courseSchema = new Schema({
 });
 
 const purchaseSchema = new Schema({
-    userId : ObjectId,
-    courseId : ObjectId
-});
+    userId : { type : ObjectId, ref : 'user'},
+    courseId : { type : ObjectId, ref : 'course'}
+})
 
 const userModel = mongoose.model('user', userSchema);
 const adminModel = mongoose.model('admin', adminSchema);
