@@ -4,7 +4,9 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { z } = require("zod");
 const { adminModel } = require("../db")
-const JWT_ADMIN_PASSWORD = "hello123jayant";
+const { JWT_ADMIN_PASSWORD } = require("../config");
+const { adminMiddleware } = require("../middleware/admin");
+
 
 // adminRouter.use(adminMiddleware);
 
@@ -90,8 +92,7 @@ adminRouter.post("/signin", async (req, res) => {
 });
 
 
-
-adminRouter.post("/course", (req, res) => {
+adminRouter.post("/course",adminMiddleware, (req, res) => {
     res.json({
         msg: "You are signed in"
     });

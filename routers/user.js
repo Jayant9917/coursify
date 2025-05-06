@@ -8,8 +8,8 @@ const { userModel } = require("../db")
 const { z } = require("zod");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const JWT_USER_PASSWORD = "aladin123";
-
+const { JWT_USER_PASSWORD } = require("../config");
+const { userMiddleware } = require("../middlewares/user");
 
 // SignUp Route
 UserRouter.post("/signup", async (req, res) => {
