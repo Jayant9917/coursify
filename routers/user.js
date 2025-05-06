@@ -9,7 +9,7 @@ const { z } = require("zod");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { JWT_USER_PASSWORD } = require("../config");
-const { userMiddleware } = require("../middlewares/user");
+const { userMiddleware } = require("../middleware/user");
 
 // SignUp Route
 UserRouter.post("/signup", async (req, res) => {
