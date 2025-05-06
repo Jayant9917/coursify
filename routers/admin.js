@@ -4,6 +4,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { z } = require("zod");
 const { adminModel } = require("../db")
+const JWT_ADMIN_PASSWORD = "hello123jayant";
 
 // adminRouter.use(adminMiddleware);
 
@@ -12,7 +13,8 @@ adminRouter.post("/signup", async (req, res) => {
     try {
         const requireBody = z.object({
             email : z.string().min(3).max(100).email(),
-            name : z.string().min(3).max(100),
+            firstName: z.string().min(3).max(100),
+            lastName: z.string().min(3).max(100),
             password : z.string().min(3).max(100)
             .refine((val) => /[a-z]/.test(val), {
                 message: "Password must contain at least one lowercase letter"
@@ -48,29 +50,30 @@ adminRouter.post("/signup", async (req, res) => {
         });
     }
         catch (error) {
+        console.error(error);
         res.status(500).json({ error: "Something went wrong during signup" });
     } 
 });
 
 // SignIn Route
-adminRouter.post("/signin", async (req, res) => {
+adminRouter.post("/signin", async (req, res) => { 
     try{
         const { email, password} = req.body;
 
-        const response = await adminModel.findOne({
+        const admin = await adminModel.findOne({
             email : email,
         });
-        if (!response){
+        if (!admin){
             res.status(403).json({
                 "msg" : "user does not exist in db"
             })
             return
         }
-        const passwordMatch = await bcrypt.compare(password, response.password);
+        const passwordMatch = await bcrypt.compare(password, admin.password);
         if (passwordMatch) {
             const token = jwt.sign({
-            id: response._id.toString()
-        }, JWT_SECRET)
+            id: admin._id.toString()
+        }, JWT_ADMIN_PASSWORD)
         
         res.json({
             token
@@ -81,6 +84,7 @@ adminRouter.post("/signin", async (req, res) => {
         })
     }
     }catch(error){
+        console.error(error);
         res.status(500).json({ error: "Something went wrong" });
     }
 });

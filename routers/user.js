@@ -8,6 +8,7 @@ const { userModel } = require("../db")
 const { z } = require("zod");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const JWT_USER_PASSWORD = "aladin123";
 
 
 // SignUp Route
@@ -60,10 +61,37 @@ UserRouter.post("/signup", async (req, res) => {
 });
 
 // SignIn Route
-UserRouter.post("/signin", (req, res) => {
-    res.json({
-        msg: "You are signed in"
-    });
+UserRouter.post("/signin", async (req, res) => {
+    try{
+        const { email, password} = req.body;
+
+        const user = await userModel.findOne({
+            email : email
+        });
+        if (!user){
+            res.status(403).json({
+                "msg" : "user does not exist in db"
+            })
+            return
+        }
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        if (passwordMatch) {
+            const token = jwt.sign({
+            id: user._id.toString()
+        }, JWT_USER_PASSWORD)
+        
+        res.json({
+            token
+        })
+    } else {
+        res.status(403).json({
+            message: "Incorrect creds"
+        })
+    }
+    }catch(error){
+        console.error(error);
+        res.status(500).json({ error: "Something went wrong" });
+    }
 });
 
 // Get all purchases
