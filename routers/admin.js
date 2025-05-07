@@ -111,11 +111,13 @@ adminRouter.post("/course", adminMiddleware, async (req, res) => {
     })
 });
 
+// Update a course in DB
 adminRouter.put("/course", adminMiddleware, async (req, res) => {
     const adminId = req.userId;
 
     const { title, description, imageUrl, price, courseId } = req.body;
 
+    // Thisis the logic for not the other admin can edit someone else's course
     // const course = await  courseModel.findOne({
     //     _id : courseId,
     //     creatorId : adminId
@@ -159,3 +161,5 @@ adminRouter.get("/course/bulk", adminMiddleware, async(req, res) => {
 module.exports = {
     adminRouter
 }
+
+//681acd334986bd902afd5f96
