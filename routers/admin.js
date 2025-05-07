@@ -111,17 +111,49 @@ adminRouter.post("/course", adminMiddleware, async (req, res) => {
     })
 });
 
-adminRouter.put("/course", (req, res) => {
-    
+adminRouter.put("/course", adminMiddleware, async (req, res) => {
+    const adminId = req.userId;
+
+    const { title, description, imageUrl, price, courseId } = req.body;
+
+    // const course = await  courseModel.findOne({
+    //     _id : courseId,
+    //     creatorId : adminId
+    // });
+
+    // if (!course){
+    //     res.status(403).json({
+    //         "msg" : "course does not exist in db"
+    //     })
+    //     return
+    // }
+
+    const course = await  courseModel.updateOne({
+        _id : courseId,
+        creatorId : adminId
+    },{
+        title : title, 
+        description : description,
+        imageUrl : imageUrl, 
+        price : price, 
+        creatorId : adminId
+    })
     res.json({
-        msg: "You are signed in"
-    });
+        msg : "course Updated",
+        courseId: course._id
+    })
 });
 
-adminRouter.get("/course/bulk", (req, res) => {
-    res.json({
-        msg: "You are signed in"
+adminRouter.get("/course/bulk", adminMiddleware, async(req, res) => {
+    const adminId = req.userId;
+    const courses = await  courseModel.find({
+        creatorId : adminId
     });
+    res.json({
+        msg : "all courses",
+        courses
+    })
+    
 });
 
 module.exports = {
