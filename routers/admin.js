@@ -8,8 +8,6 @@ const { JWT_ADMIN_PASSWORD } = require("../config");
 const { adminMiddleware } = require("../middleware/admin");
 
 
-// adminRouter.use(adminMiddleware);
-
 // SignUp Route
 adminRouter.post("/signup", async (req, res) => {
     try {
@@ -162,4 +160,3 @@ module.exports = {
     adminRouter
 }
 
-//681acd334986bd902afd5f96

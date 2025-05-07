@@ -92,10 +92,27 @@ UserRouter.post("/signin", async (req, res) => {
 });
 
 // Get all purchases
-UserRouter.get("/purchases", (req, res) => {
-    res.json({
-        msg: "Your purchased courses"
+UserRouter.get("/purchases", userMiddleware, async(req, res) => {
+    const userId = req.userId;
+
+    const purchases = await purchaseModel.find({
+        userId,
     });
+
+    let purchasedCourseIds = [];
+
+    for (let i = 0; i<purchases.length;i++){ 
+        purchasedCourseIds.push(purchases[i].courseId)
+    }
+
+    const coursesData = await courseModel.find({
+        _id: { $in: purchasedCourseIds }
+    })
+
+    res.json({
+        purchases,
+        coursesData
+    })
 });
 
 module.exports = {
