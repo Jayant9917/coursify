@@ -1,6 +1,3 @@
-// const express = require("express");
-// const UserRouter = express.Router();
-
 const{ Router } = require("express");
 const UserRouter = Router();
 
@@ -104,3 +101,6 @@ UserRouter.get("/purchases", (req, res) => {
 module.exports = {
     UserRouter
 };
+
+// const express = require("express");
+// const UserRouter = express.Router();

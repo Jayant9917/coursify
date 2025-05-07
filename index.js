@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 
@@ -17,7 +18,7 @@ app.use("/api/v1/admin", adminRouter);
 
 async function main() {
     try {
-        await mongoose.connect("mongodb+srv://admin:jayant132465rana@cluster0.cty7ree.mongodb.net/coursify-app");
+        await mongoose.connect(process.env.MONGODB_URL);
         console.log("Connected to MongoDB");
         app.listen(3001, () => {
             console.log("Server is running on port 3001");
