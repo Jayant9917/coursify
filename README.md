@@ -1,39 +1,22 @@
 # Coursify
 
-A modern course management platform built with Node.js, Express, and MongoDB.
-
-# Creating a course selling app
-- Initialize a new Node.js project
-- Add Express, jsonwebtoken, mongoose to it as a dependency
-- Create index.js
-- Add route skeleton for user login, signup, purchase a course, sees all courses, sees the purchased courses course
-- Add routes for admin login, admin signup, create a course, delete a course, add course content.
-- Define the schema for User, Admin, Course, Purchase
-- Add a database (mongodb), use dotenv to store the database connection string
-- Add middlewares for user and admin auth
-- Complete the routes for user login, signup, purchase a course, see course (Extra points - Use express routing to better structure your routes)
-- Create the frontend
+Coursify is a RESTful API service built with Node.js and Express.js for managing courses, users, and administrative functions. The application uses MongoDB as its database and implements JWT authentication for secure access.
 
 ## Features
 
-- User authentication and management
-- Admin dashboard and controls
-- Course creation and management
-- Course purchase system
-- RESTful API architecture
-
-## Tech Stack
-
-- **Backend**: Node.js, Express.js
-- **Database**: MongoDB
-- **ORM**: Mongoose
-- **API**: RESTful API
+- User authentication and authorization
+- Course management
+- Admin dashboard
+- RESTful API endpoints
+- MongoDB database integration
+- JWT-based security
 
 ## Prerequisites
 
-- Node.js (Latest LTS version recommended)
-- MongoDB Atlas account or local MongoDB installation
-- npm (Node Package Manager)
+Before running this project, make sure you have the following installed:
+- Node.js (v14 or higher)
+- MongoDB
+- npm or yarn
 
 ## Installation
 
@@ -48,18 +31,26 @@ cd coursify
 npm install
 ```
 
-3. Set up environment variables:
-Create a `.env` file in the root directory and add your MongoDB connection string:
+3. Create a `.env` file in the root directory and add the following environment variables:
 ```
-MONGODB_URI=your_mongodb_connection_string
-```
-
-4. Start the server:
-```bash
-npm start
+MONGODB_URL=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
 ```
 
-The server will start running on port 3001.
+## Project Structure
+
+```
+coursify/
+├── config.js         # Configuration settings
+├── db.js            # Database connection setup
+├── index.js         # Main application entry point
+├── middleware/      # Custom middleware functions
+├── routers/         # API route handlers
+│   ├── admin.js     # Admin routes
+│   ├── course.js    # Course routes
+│   └── user.js      # User routes
+└── package.json     # Project dependencies and scripts
+```
 
 ## API Endpoints
 
@@ -68,46 +59,51 @@ The server will start running on port 3001.
 - User profile management
 
 ### Course Routes (`/api/v1/course`)
-- Course listing
-- Course details
-- Course purchase
+- Course creation and management
+- Course listing and details
 
 ### Admin Routes (`/api/v1/admin`)
-- Admin authentication
-- Course management
+- Administrative functions
 - User management
+- System settings
 
-## Database Schema
+## Running the Application
 
-### User Schema
-- email (unique)
-- password
-- firstName
-- lastName
+Development mode:
+```bash
+npm run dev
+```
 
-### Admin Schema
-- email (unique)
-- password
-- firstName
-- lastName
+Production mode:
+```bash
+npm start
+```
 
-### Course Schema
-- title
-- description
-- price
-- imageUrl
-- creatorId
+The server will start running on port 3001.
 
-### Purchase Schema
-- userId (reference to User)
-- courseId (reference to Course)
+## Dependencies
+
+- express: Web framework
+- mongoose: MongoDB object modeling
+- bcrypt: Password hashing
+- jsonwebtoken: JWT authentication
+- dotenv: Environment variable management
+- zod: Schema validation
+- nodemon: Development server with auto-reload
+
+## Security
+
+- JWT-based authentication
+- Password hashing with bcrypt
+- Environment variable protection
+- Input validation with Zod
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
 
 
