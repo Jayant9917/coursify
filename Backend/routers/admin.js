@@ -36,13 +36,14 @@ adminRouter.post("/signup", async (req, res) => {
             return
         }
 
-        const { email, password, name } = req.body;
+        const { email, password, firstName, lastName } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
 
         await adminModel.create({
             email: email,
             password: hashedPassword,
-            name: name
+            firstName: firstName,
+            lastName: lastName
         });
 
         res.json({
@@ -91,69 +92,115 @@ adminRouter.post("/signin", async (req, res) => {
 
 // Create a course in DB
 adminRouter.post("/course", adminMiddleware, async (req, res) => {
-    const adminId = req.userId;
+    try {
+        const adminId = req.userId;
+        const { title, description, imageUrl, price } = req.body;
 
-    const { title, description, imageUrl, price } = req.body;
+        // Validate course data
+        if (!title || !description || !price) {
+            return res.status(400).json({
+                msg: "Missing required fields"
+            });
+        }
 
-    // Creating a saas in 6 hours
-    const course = await  courseModel.create({
-        title : title, 
-        description : description,
-        imageUrl : imageUrl, 
-        price : price, 
-        creatorId : adminId
-    })
-    res.json({
-        msg : "course created",
-        courseId: course._id
-    })
+        if (typeof price !== 'number' || price < 0) {
+            return res.status(400).json({
+                msg: "Invalid price"
+            });
+        }
+
+        const course = await courseModel.create({
+            title,
+            description,
+            imageUrl,
+            price,
+            creatorId: adminId
+        });
+
+        res.json({
+            msg: "Course created successfully",
+            courseId: course._id
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Something went wrong while creating course"
+        });
+    }
 });
 
 // Update a course in DB
 adminRouter.put("/course", adminMiddleware, async (req, res) => {
-    const adminId = req.userId;
+    try {
+        const adminId = req.userId;
+        const { title, description, imageUrl, price, courseId } = req.body;
 
-    const { title, description, imageUrl, price, courseId } = req.body;
+        // Validate course data
+        if (!title || !description || !price || !courseId) {
+            return res.status(400).json({
+                msg: "Missing required fields"
+            });
+        }
 
-    // Thisis the logic for not the other admin can edit someone else's course
-    // const course = await  courseModel.findOne({
-    //     _id : courseId,
-    //     creatorId : adminId
-    // });
+        if (typeof price !== 'number' || price < 0) {
+            return res.status(400).json({
+                msg: "Invalid price"
+            });
+        }
 
-    // if (!course){
-    //     res.status(403).json({
-    //         "msg" : "course does not exist in db"
-    //     })
-    //     return
-    // }
+        // Check if course exists and belongs to admin
+        const course = await courseModel.findOne({
+            _id: courseId,
+            creatorId: adminId
+        });
 
-    const course = await  courseModel.updateOne({
-        _id : courseId,
-        creatorId : adminId
-    },{
-        title : title, 
-        description : description,
-        imageUrl : imageUrl, 
-        price : price, 
-        creatorId : adminId
-    })
-    res.json({
-        msg : "course Updated",
-        courseId: course._id
-    })
+        if (!course) {
+            return res.status(403).json({
+                msg: "Course not found or you don't have permission to update it"
+            });
+        }
+
+        const updatedCourse = await courseModel.updateOne(
+            {
+                _id: courseId,
+                creatorId: adminId
+            },
+            {
+                title,
+                description,
+                imageUrl,
+                price
+            }
+        );
+
+        res.json({
+            msg: "Course updated successfully",
+            courseId: courseId
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Something went wrong while updating course"
+        });
+    }
 });
 
 adminRouter.get("/course/bulk", adminMiddleware, async(req, res) => {
-    const adminId = req.userId;
-    const courses = await  courseModel.find({
-        creatorId : adminId
-    });
-    res.json({
-        msg : "all courses",
-        courses
-    })
-    
+    try {
+        const adminId = req.userId;
+        const courses = await courseModel.find({
+            creatorId: adminId
+        });
+        res.json({
+            msg: "Courses retrieved successfully",
+            courses
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Something went wrong while fetching courses"
+        });
+    }
 });
 
 module.exports = {

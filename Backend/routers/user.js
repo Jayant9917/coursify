@@ -1,7 +1,7 @@
 const{ Router } = require("express");
 const UserRouter = Router();
 
-const { userModel, purchaseModel } = require("../db")
+const { userModel, purchaseModel, courseModel } = require("../db")
 const { z } = require("zod");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -93,26 +93,33 @@ UserRouter.post("/signin", async (req, res) => {
 
 // Get all purchases
 UserRouter.get("/purchases", userMiddleware, async(req, res) => {
-    const userId = req.userId;
+    try {
+        const userId = req.userId;
 
-    const purchases = await purchaseModel.find({
-        userId,
-    });
+        const purchases = await purchaseModel.find({
+            userId,
+        });
 
-    let purchasedCourseIds = [];
+        let purchasedCourseIds = [];
 
-    for (let i = 0; i<purchases.length;i++){ 
-        purchasedCourseIds.push(purchases[i].courseId)
+        for (let i = 0; i<purchases.length;i++){ 
+            purchasedCourseIds.push(purchases[i].courseId)
+        }
+
+        const coursesData = await courseModel.find({
+            _id: { $in: purchasedCourseIds }
+        });
+
+        res.json({
+            purchases,
+            coursesData
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Something went wrong while fetching purchases"
+        });
     }
-
-    const coursesData = await courseModel.find({
-        _id: { $in: purchasedCourseIds }
-    })
-
-    res.json({
-        purchases,
-        coursesData
-    })
 });
 
 module.exports = {

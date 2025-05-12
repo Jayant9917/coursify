@@ -10,7 +10,7 @@ const app = express();
 const port = 3001;
 app.use(express.json());
 
-
+// Routes
 app.use("/api/v1/user", UserRouter);
 app.use("/api/v1/course", CourseRouter);
 app.use("/api/v1/admin", adminRouter);
@@ -20,8 +20,8 @@ async function main() {
     try {
         await mongoose.connect(process.env.MONGODB_URL);
         console.log("Connected to MongoDB");
-        app.listen(3001, () => {
-            console.log("Server is running on port 3001");
+        app.listen(port, () => {
+            console.log("Server is running on " + port);
         });
     } catch (err) {
         console.error("MongoDB connection error:", err);

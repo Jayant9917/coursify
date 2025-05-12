@@ -4,37 +4,62 @@
 const{ Router } = require("express");
 const CourseRouter = Router();
 
-const { courseModel } = require("../db");
-
+const { courseModel, purchaseModel } = require("../db");
+const { userMiddleware } = require("../middleware/user");
 
 CourseRouter.post("/purchase", userMiddleware, async (req, res) => {
-    // When the user wants to buy a course
-    //you can expect the user to pay you the price of the course
-    // No complication for razorpay
+    try {
+        const { courseId } = req.body;
+        const userId = req.userId;
 
-    const { courseId } = req.body;
-    const userId = req.userId;
+        // Check if course exists
+        const course = await courseModel.findById(courseId);
+        if (!course) {
+            return res.status(404).json({
+                msg: "Course not found"
+            });
+        }
 
-    // You can also check if the user already buy this cousres
-    // avoid buy something again
+        // Check if already purchased
+        const existingPurchase = await purchaseModel.findOne({
+            userId,
+            courseId
+        });
 
-        await courseModel.create({
-                userId : userId,
-                courseId : courseId
-        })
+        if (existingPurchase) {
+            return res.status(400).json({
+                msg: "Course already purchased"
+            });
+        }
+
+        await purchaseModel.create({
+            userId,
+            courseId
+        });
     
         res.json({
-            msg: "You have succesfull Bought the course"
-        })
-    });
-
+            msg: "You have successfully purchased the course"
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Something went wrong during purchase"
+        });
+    }
+});
 
 CourseRouter.get("/preview", async (req, res) => {
-    const courses = await courseModel.find({});
-
-    res.json({
-        courses
-    })
+    try {
+        const courses = await courseModel.find({});
+        res.json({
+            courses
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Something went wrong while fetching courses"
+        });
+    }
 });
 
 module.exports = {
