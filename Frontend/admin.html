@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coursify Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <h1>Coursify Admin</h1>
+        </div>
+        <div class="nav-links" id="navLinks">
+            <a href="#" class="active">Dashboard</a>
+            <a href="#" id="logoutBtn">Logout</a>
+        </div>
+    </nav>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="spinner"></div>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Auth Modals -->
+    <div id="signinModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Admin Sign In</h2>
+            <form id="signinForm">
+                <div class="form-group">
+                    <label for="signinEmail">Email</label>
+                    <input type="email" id="signinEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="signinPassword">Password</label>
+                    <input type="password" id="signinPassword" required>
+                </div>
+                <button type="submit" class="btn-primary">Sign In</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="signupModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Admin Sign Up</h2>
+            <form id="signupForm">
+                <div class="form-group">
+                    <label for="signupFirstName">First Name</label>
+                    <input type="text" id="signupFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupLastName">Last Name</label>
+                    <input type="text" id="signupLastName" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Email</label>
+                    <input type="email" id="signupEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" required>
+                </div>
+                <button type="submit" class="btn-primary">Sign Up</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard Content -->
+    <div id="adminContent" style="display: none;">
+        <div class="container">
+            <h1>Admin Dashboard</h1>
+            
+            <!-- Create Course Form -->
+            <div class="section">
+                <h2>Create New Course</h2>
+                <form id="createCourseForm">
+                    <div class="form-group">
+                        <label for="courseTitle">Course Title</label>
+                        <input type="text" id="courseTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="courseDescription">Course Description</label>
+                        <textarea id="courseDescription" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="courseImageUrl">Image URL</label>
+                        <input type="url" id="courseImageUrl" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="coursePrice">Price</label>
+                        <input type="number" id="coursePrice" min="0" step="0.01" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Create Course</button>
+                </form>
+            </div>
+
+            <!-- Course List -->
+            <div class="section">
+                <h2>Your Courses</h2>
+                <div id="adminCourses" class="courses-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>Coursify Admin</h3>
+                <p>Manage your courses and content with our powerful admin dashboard. Create, edit, and monitor your educational offerings.</p>
+                <div class="footer-social">
+                    <a href="#"><i class="fab fa-facebook"></i></a>
+                    <a href="#"><i class="fab fa-twitter"></i></a>
+                    <a href="#"><i class="fab fa-linkedin"></i></a>
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h3>Quick Links</h3>
+                <ul class="footer-links">
+                    <li><a href="index.html">View Website</a></li>
+                    <li><a href="#courses">Manage Courses</a></li>
+                    <li><a href="#support">Support</a></li>
+                    <li><a href="#settings">Settings</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Admin Support</h3>
+                <ul class="footer-links">
+                    <li><i class="fas fa-envelope"></i> admin@coursify.com</li>
+                    <li><i class="fas fa-phone"></i> +1 (555) 987-6543</li>
+                    <li><i class="fas fa-clock"></i> 24/7 Support</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 Coursify Admin. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="admin.js"></script>
+</body>
+</html> 

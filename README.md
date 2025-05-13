@@ -1,109 +1,149 @@
-# Coursify
+# Coursify - Online Course Platform
 
-Coursify is a RESTful API service built with Node.js and Express.js for managing courses, users, and administrative functions. The application uses MongoDB as its database and implements JWT authentication for secure access.
+Coursify is a full-stack web application that allows users to browse, purchase, and access online courses. The platform includes both user and admin interfaces for course management.
 
 ## Features
 
-- User authentication and authorization
-- Course management
-- Admin dashboard
-- RESTful API endpoints
-- MongoDB database integration
-- JWT-based security
+### User Features
+- User authentication (signup/signin)
+- Browse available courses
+- View detailed course information
+- Purchase courses
+- Access purchased courses
+- Responsive design for all devices
+
+### Admin Features
+- Admin authentication
+- Create new courses
+- Edit existing courses
+- Delete courses
+- View all courses
+- Manage course content
+
+## Tech Stack
+
+### Frontend
+- HTML5
+- CSS3
+- JavaScript (Vanilla)
+- Font Awesome Icons
+- Axios for API calls
+
+### Backend
+- Node.js
+- Express.js
+- MongoDB
+- JWT Authentication
+- Zod for validation
 
 ## Prerequisites
 
 Before running this project, make sure you have the following installed:
 - Node.js (v14 or higher)
 - MongoDB
-- npm or yarn
+- Git
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/yourusername/coursify.git
 cd coursify
 ```
 
-2. Install dependencies:
+2. Install backend dependencies:
 ```bash
+cd Backend
 npm install
 ```
 
-3. Create a `.env` file in the root directory and add the following environment variables:
-```
-MONGODB_URL=your_mongodb_connection_string
+3. Create a `.env` file in the Backend directory with the following variables:
+```env
+PORT=3001
+MONGODB_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret
 ```
 
-## Project Structure
-
-```
-coursify/
-├── config.js         # Configuration settings
-├── db.js            # Database connection setup
-├── index.js         # Main application entry point
-├── middleware/      # Custom middleware functions
-├── routers/         # API route handlers
-│   ├── admin.js     # Admin routes
-│   ├── course.js    # Course routes
-│   └── user.js      # User routes
-└── package.json     # Project dependencies and scripts
-```
-
-## API Endpoints
-
-### User Routes (`/api/v1/user`)
-- User registration and authentication
-- User profile management
-
-### Course Routes (`/api/v1/course`)
-- Course creation and management
-- Course listing and details
-
-### Admin Routes (`/api/v1/admin`)
-- Administrative functions
-- User management
-- System settings
-
-## Running the Application
-
-Development mode:
-```bash
-npm run dev
-```
-
-Production mode:
+4. Start the backend server:
 ```bash
 npm start
 ```
 
-The server will start running on port 3001.
+5. Open the Frontend folder and serve the files using a local server (e.g., Live Server in VS Code)
 
-## Dependencies
+## Project Structure
 
-- express: Web framework
-- mongoose: MongoDB object modeling
-- bcrypt: Password hashing
-- jsonwebtoken: JWT authentication
-- dotenv: Environment variable management
-- zod: Schema validation
-- nodemon: Development server with auto-reload
+```
+Coursify/
+├── Frontend/
+│   ├── index.html          # Main user interface
+│   ├── admin.html          # Admin dashboard
+│   ├── style.css           # Global styles
+│   ├── script.js           # User interface logic
+│   └── admin.js            # Admin dashboard logic
+│
+├── Backend/
+│   ├── index.js            # Server entry point
+│   ├── db.js               # Database connection
+│   ├── config.js           # Configuration
+│   ├── middleware/         # Custom middleware
+│   └── routers/            # API routes
+│
+└── README.md
+```
 
-## Security
+## API Endpoints
 
-- JWT-based authentication
-- Password hashing with bcrypt
-- Environment variable protection
-- Input validation with Zod
+### User Routes
+- `POST /api/v1/user/signup` - Register new user
+- `POST /api/v1/user/signin` - User login
+- `GET /api/v1/user/purchases` - Get user's purchased courses
+- `POST /api/v1/course/purchase` - Purchase a course
+
+### Admin Routes
+- `POST /api/v1/admin/signup` - Register new admin
+- `POST /api/v1/admin/signin` - Admin login
+- `POST /api/v1/admin/course` - Create new course
+- `PUT /api/v1/admin/course/:id` - Update course
+- `DELETE /api/v1/admin/course/:id` - Delete course
+- `GET /api/v1/admin/courses` - Get all courses
+
+### Course Routes
+- `GET /api/v1/course/preview` - Get all courses (preview)
+
+## Usage
+
+1. Start the backend server:
+```bash
+cd Backend
+npm start
+```
+
+2. Open `Frontend/index.html` in your browser to access the user interface
+3. Open `Frontend/admin.html` to access the admin dashboard
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Font Awesome for icons
+- MongoDB for database
+- Express.js for backend framework
+- Node.js for runtime environment
+
+## Contact
+
+Your Name - your.email@example.com
+Project Link: [https://github.com/yourusername/coursify](https://github.com/yourusername/coursify)
 
 

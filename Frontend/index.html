@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coursify - Learn Without Limits</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <h1>Coursify</h1>
+        </div>
+        <div class="nav-links" id="navLinks">
+            <a href="#" class="active">Home</a>
+            <a href="#courses">Courses</a>
+            <a href="#" id="signinBtn">Sign In</a>
+            <a href="#" id="signupBtn" class="btn-primary">Sign Up</a>
+            <a href="admin.html" class="admin-link">Admin Dashboard</a>
+        </div>
+    </nav>
+
+    <!-- Landing Page Content (shown when not logged in) -->
+    <div id="landingContent">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Learn Without Limits</h1>
+                <p>Transform your future with expert-led courses. Join thousands of learners worldwide and unlock your potential with Coursify's comprehensive learning platform.</p>
+                <div class="hero-buttons">
+                    <a href="#" id="getStartedBtn" class="btn-primary">Start Learning Today</a>
+                    <a href="#courses" class="btn-secondary">Explore Courses</a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <div class="stat-number">10K+</div>
+                        <div class="stat-label">Active Students</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">500+</div>
+                        <div class="stat-label">Expert Courses</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">95%</div>
+                        <div class="stat-label">Success Rate</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Courses Section -->
+        <section id="courses" class="courses">
+            <h2>Featured Courses</h2>
+            <div class="courses-grid" id="coursesGrid">
+                <!-- Courses will be dynamically loaded here -->
+            </div>
+        </section>
+    </div>
+
+    <!-- Dashboard Content (shown when logged in) -->
+    <div id="dashboardContent" style="display: none;">
+        <div class="dashboard">
+            <div class="dashboard-header">
+                <h2>Welcome to your Dashboard</h2>
+                <p>Manage your courses and track your progress</p>
+            </div>
+
+            <!-- Purchased Courses Section -->
+            <section class="dashboard-section">
+                <h3>Your Purchased Courses</h3>
+                <div class="courses-grid" id="purchasedCourses">
+                    <!-- Purchased courses will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Available Courses Section -->
+            <section class="dashboard-section">
+                <h3>Available Courses</h3>
+                <div class="courses-grid" id="availableCourses">
+                    <!-- Available courses will be loaded here -->
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Auth Modals -->
+    <div id="signinModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Sign In</h2>
+            <form id="signinForm">
+                <div class="form-group">
+                    <label for="signinEmail">Email</label>
+                    <input type="email" id="signinEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="signinPassword">Password</label>
+                    <input type="password" id="signinPassword" required>
+                </div>
+                <button type="submit" class="btn-primary">Sign In</button>
+            </form>
+            <p class="auth-switch">Don't have an account? <a href="#" id="switchToSignup">Sign Up</a></p>
+        </div>
+    </div>
+
+    <div id="signupModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Sign Up</h2>
+            <form id="signupForm">
+                <div class="form-group">
+                    <label for="signupFirstName">First Name</label>
+                    <input type="text" id="signupFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupLastName">Last Name</label>
+                    <input type="text" id="signupLastName" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Email</label>
+                    <input type="email" id="signupEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" required>
+                </div>
+                <button type="submit" class="btn-primary">Sign Up</button>
+            </form>
+            <p class="auth-switch">Already have an account? <a href="#" id="switchToSignin">Sign In</a></p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>About Coursify</h3>
+                <p>Your premier destination for online learning. We provide high-quality courses taught by industry experts to help you achieve your goals.</p>
+                <div class="footer-social">
+                    <a href="#"><i class="fab fa-facebook"></i></a>
+                    <a href="#"><i class="fab fa-twitter"></i></a>
+                    <a href="#"><i class="fab fa-linkedin"></i></a>
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h3>Quick Links</h3>
+                <ul class="footer-links">
+                    <li><a href="#courses">Browse Courses</a></li>
+                    <li><a href="#about">About Us</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                    <li><a href="#faq">FAQ</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Contact Us</h3>
+                <ul class="footer-links">
+                    <li><i class="fas fa-envelope"></i> support@coursify.com</li>
+                    <li><i class="fas fa-phone"></i> +1 (555) 123-4567</li>
+                    <li><i class="fas fa-map-marker-alt"></i> 123 Education St, Learning City</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 Coursify. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="spinner"></div>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "coursify",
+  "version": "1.0.0",
+  "description": "Coursify - A Learning Management System",
+  "scripts": {
+    "start": "cd Backend && npm start",
+    "dev": "cd Backend && npm run dev",
+    "install-all": "npm install && cd Backend && npm install",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+} 
