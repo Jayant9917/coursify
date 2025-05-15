@@ -1,136 +1,119 @@
-# Coursify - Online Course Platform
+# Coursify - Online Learning Platform
 
-Coursify is a full-stack web application that allows users to browse, purchase, and access online courses. The platform includes both user and admin interfaces for course management.
+A full-stack web application for online course management and learning.
 
 ## Features
 
+### Admin Features
+- Admin authentication (signup/signin)
+- Course management:
+  - Create new courses
+  - View all courses
+  - View specific course details
+  - Update course information
+  - Delete courses
+
 ### User Features
 - User authentication (signup/signin)
-- Browse available courses
-- View detailed course information
-- Purchase courses
-- Access purchased courses
-- Responsive design for all devices
-
-### Admin Features
-- Admin authentication
-- Create new courses
-- Edit existing courses
-- Delete courses
-- View all courses
-- Manage course content
+- Course browsing
+- Course purchasing
+- Course reviews and ratings
 
 ## Tech Stack
-
-### Frontend
-- HTML5
-- CSS3
-- JavaScript (Vanilla)
-- Font Awesome Icons
-- Axios for API calls
 
 ### Backend
 - Node.js
 - Express.js
 - MongoDB
 - JWT Authentication
-- Zod for validation
 
-## Prerequisites
-
-Before running this project, make sure you have the following installed:
-- Node.js (v14 or higher)
-- MongoDB
-- Git
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/Jayant9917/coursify.git
-cd coursify
-```
-
-2. Install backend dependencies:
-```bash
-cd Backend
-npm install
-```
-
-3. Create a `.env` file in the Backend directory with the following variables:
-```env
-PORT=3001
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-```
-
-4. Start the backend server:
-```bash
-npm run start
-```
-
-5. Open the Frontend folder and serve the files using a local server (e.g., Live Server in VS Code)
+### Frontend
+- HTML
+- CSS
+- JavaScript (Vanilla)
 
 ## Project Structure
 
 ```
-Coursify/
-├── Frontend/
-│   ├── index.html          # Main user interface
-│   ├── admin.html          # Admin dashboard
-│   ├── style.css           # Global styles
-│   ├── script.js           # User interface logic
-│   └── admin.js            # Admin dashboard logic
-│
+coursify/
 ├── Backend/
-│   ├── index.js            # Server entry point
-│   ├── db.js               # Database connection
-│   ├── config.js           # Configuration
-│   ├── middleware/         # Custom middleware
-│   └── routers/            # API routes
-│
-└── README.md
+│   ├── routers/
+│   │   ├── admin.js
+│   │   ├── course.js
+│   │   └── user.js
+│   ├── middleware/
+│   │   └── auth.js
+│   ├── db.js
+│   ├── config.js
+│   └── index.js
+└── Frontend/
+    ├── index.html
+    ├── admin.html
+    ├── style.css
+    ├── script.js
+    └── admin.js
 ```
 
 ## API Endpoints
 
-### User Routes
-- `POST /api/v1/user/signup` - Register new user
-- `POST /api/v1/user/signin` - User login
-- `GET /api/v1/user/purchases` - Get user's purchased courses
-- `POST /api/v1/course/purchase` - Purchase a course
-
 ### Admin Routes
-- `POST /api/v1/admin/signup` - Register new admin
+- `POST /api/v1/admin/signup` - Admin registration
 - `POST /api/v1/admin/signin` - Admin login
 - `POST /api/v1/admin/course` - Create new course
-- `PUT /api/v1/admin/course/:id` - Update course
-- `DELETE /api/v1/admin/course/:id` - Delete course
-- `GET /api/v1/admin/courses` - Get all courses
+- `GET /api/v1/admin/courses/all` - Get all courses
+- `GET /api/v1/admin/course/:courseId` - Get specific course
+- `PUT /api/v1/admin/course/:courseId` - Update course
+- `DELETE /api/v1/admin/course/:courseId` - Delete course
 
-### Course Routes
-- `GET /api/v1/course/preview` - Get all courses (preview)
+### User Routes
+- `POST /api/v1/user/signup` - User registration
+- `POST /api/v1/user/signin` - User login
+- `POST /api/v1/course/purchase` - Purchase a course
+- `POST /api/v1/course/review/:courseId` - Add course review
+- `GET /api/v1/course/reviews/:courseId` - Get course reviews
 
-## Usage
+## Setup Instructions
 
-1. Start the backend server:
-```bash
-cd Backend
-npm start
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   cd Backend
+   npm install
+   ```
+3. Set up environment variables in `config.js`
+4. Start the backend server:
+   ```bash
+   npm start
+   ```
+5. Open the Frontend files in your browser
+
+## Environment Variables
+
+Create a `config.js` file in the Backend directory with the following variables:
+```javascript
+module.exports = {
+    PORT: 3001,
+    MONGODB_URI: "your_mongodb_uri",
+    JWT_SECRET: "your_jwt_secret"
+};
 ```
 
-2. Open `Frontend/index.html` in your browser to access the user interface
-3. Open `Frontend/admin.html` to access the admin dashboard
+## Security Features
+- JWT-based authentication
+- Password hashing
+- Protected routes for admin and user actions
 
-## Contributing
+## Current Limitations
+- Basic course structure without modules/lessons
+- Simple review system
+- Basic user progress tracking
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-
+## Future Enhancements
+- Course content management (modules, lessons)
+- Advanced user progress tracking
+- Payment gateway integration
+- Course search and filtering
+- User profile management
 
 ## Acknowledgments
 
@@ -143,5 +126,4 @@ npm start
 
 Your Name - ranajayant527@gmail.com
 Project Link: [https://github.com/Jayant9917/coursify.git](https://github.com/yourusername/coursify)
-
 
