@@ -68,19 +68,14 @@ function updateAuthState() {
         landingContent.style.display = 'block';
         dashboardContent.style.display = 'none';
         loadFeaturedCourses();
-        
-        // Add event listeners to the newly created buttons
-        document.getElementById('signinBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            openModal(signinModal);
-        });
-        document.getElementById('signupBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            openModal(signupModal);
-        });
     }
 
-    // Add click event listeners to all nav links for mobile menu
+    // Add event listeners to navigation links
+    attachNavLinkListeners();
+}
+
+// Function to attach event listeners to navigation links
+function attachNavLinkListeners() {
     const navLinksElements = document.querySelectorAll('#navLinks a');
     navLinksElements.forEach(link => {
         link.addEventListener('click', (e) => {
@@ -91,13 +86,16 @@ function updateAuthState() {
             
             // Close mobile menu
             if (hamburgerMenu) hamburgerMenu.classList.remove('active');
-            const navLinksContainer = document.getElementById('navLinks');
-            if (navLinksContainer) navLinksContainer.classList.remove('active');
+            if (navLinks) navLinks.classList.remove('active');
             if (navBackdrop) navBackdrop.classList.remove('active');
             document.body.classList.remove('menu-open');
 
             // Handle special cases
-            if (link.id === 'logoutBtn') {
+            if (link.id === 'signinBtn') {
+                openModal(signinModal);
+            } else if (link.id === 'signupBtn') {
+                openModal(signupModal);
+            } else if (link.id === 'logoutBtn') {
                 localStorage.removeItem('token');
                 updateAuthState();
                 showToast('Successfully logged out!');
@@ -437,24 +435,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Hamburger menu toggle
-    if (hamburgerMenu) {
+    if (hamburgerMenu && navLinks && navBackdrop) {
+        let isMenuOpen = false;
+
         hamburgerMenu.addEventListener('click', () => {
+            isMenuOpen = !isMenuOpen;
             hamburgerMenu.classList.toggle('active');
-            const navLinksContainer = document.getElementById('navLinks');
-            if (navLinksContainer) navLinksContainer.classList.toggle('active');
-            if (navBackdrop) navBackdrop.classList.toggle('active');
+            navLinks.classList.toggle('active');
+            navBackdrop.classList.toggle('active');
             document.body.classList.toggle('menu-open');
+            
+            // Reattach event listeners when menu is opened
+            if (isMenuOpen) {
+                attachNavLinkListeners();
+            }
         });
-    }
-    
-    // Backdrop click to close menu
-    if (navBackdrop) {
-        navBackdrop.addEventListener('click', () => {
-            if (hamburgerMenu) hamburgerMenu.classList.remove('active');
-            const navLinksContainer = document.getElementById('navLinks');
-            if (navLinksContainer) navLinksContainer.classList.remove('active');
-            if (navBackdrop) navBackdrop.classList.remove('active');
-            document.body.classList.remove('menu-open');
+
+        // Backdrop click to close menu
+        navBackdrop.addEventListener('click', (e) => {
+            if (e.target === navBackdrop) {
+                isMenuOpen = false;
+                hamburgerMenu.classList.remove('active');
+                navLinks.classList.remove('active');
+                navBackdrop.classList.remove('active');
+                document.body.classList.remove('menu-open');
+            }
+        });
+
+        // Prevent clicks inside nav-links from bubbling to backdrop
+        navLinks.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
     }
 });
