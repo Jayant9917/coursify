@@ -47,7 +47,7 @@ Before running this project, make sure you have the following installed:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/coursify.git
+git clone https://github.com/Jayant9917/coursify.git
 cd coursify
 ```
 
@@ -66,7 +66,7 @@ JWT_SECRET=your_jwt_secret
 
 4. Start the backend server:
 ```bash
-npm start
+npm run start
 ```
 
 5. Open the Frontend folder and serve the files using a local server (e.g., Live Server in VS Code)
@@ -130,9 +130,7 @@ npm start
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 
@@ -143,7 +141,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Contact
 
-Your Name - your.email@example.com
-Project Link: [https://github.com/yourusername/coursify](https://github.com/yourusername/coursify)
+Your Name - ranajayant527@gmail.com
+Project Link: [https://github.com/Jayant9917/coursify.git](https://github.com/yourusername/coursify)
 
 
