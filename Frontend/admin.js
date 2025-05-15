@@ -3,7 +3,10 @@ const API_BASE_URL = 'http://localhost:3001/api/v1';
 
 // DOM Elements
 const navLinks = document.getElementById('navLinks');
+const hamburgerMenu = document.getElementById('hamburgerMenu');
+const navBackdrop = document.getElementById('navBackdrop');
 const adminContent = document.getElementById('adminContent');
+const adminWelcome = document.getElementById('adminWelcome');
 const loadingSpinner = document.getElementById('loadingSpinner');
 const toast = document.getElementById('toast');
 const signinModal = document.getElementById('signinModal');
@@ -39,19 +42,23 @@ function updateAuthState() {
     if (token) {
         // Admin is logged in
         navLinks.innerHTML = `
+            <a href="index.html">Home</a>
             <a href="#" class="active">Dashboard</a>
             <a href="#" id="logoutBtn">Logout</a>
         `;
         adminContent.style.display = 'block';
+        adminWelcome.style.display = 'none';
         loadAdminCourses();
     } else {
         // Admin is not logged in
         navLinks.innerHTML = `
+            <a href="index.html">Home</a>
             <a href="#" class="active">Admin Dashboard</a>
-            <a href="#" id="signinBtn">Sign In</a>
+            <a href="#" id="signinBtn" class="btn-primary">Sign In</a>
             <a href="#" id="signupBtn" class="btn-primary">Sign Up</a>
         `;
         adminContent.style.display = 'none';
+        adminWelcome.style.display = 'block';
 
         // Add event listeners to the newly created buttons
         document.getElementById('signinBtn').addEventListener('click', (e) => {
@@ -62,6 +69,19 @@ function updateAuthState() {
             e.preventDefault();
             openModal(signupModal);
         });
+        
+        // Add event listeners to welcome page buttons
+        if (document.getElementById('welcomeSigninBtn')) {
+            document.getElementById('welcomeSigninBtn').addEventListener('click', () => {
+                openModal(signinModal);
+            });
+        }
+        
+        if (document.getElementById('welcomeSignupBtn')) {
+            document.getElementById('welcomeSignupBtn').addEventListener('click', () => {
+                openModal(signupModal);
+            });
+        }
     }
 }
 
@@ -177,10 +197,14 @@ function displayAdminCourses(courses) {
             <div class="course-content">
                 <h3 class="course-title">${course.title}</h3>
                 <p class="course-description">${course.description}</p>
-                <p class="course-price">$${course.price}</p>
+                <p class="course-price">₹${course.price}</p>
                 <div class="course-actions">
-                    <button onclick="editCourse('${course._id}')" class="btn-secondary">Edit</button>
-                    <button onclick="deleteCourse('${course._id}')" class="btn-danger">Delete</button>
+                    <button onclick="editCourse('${course._id}')" class="btn-secondary">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button onclick="deleteCourse('${course._id}')" class="btn-danger">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
                 </div>
             </div>
         </div>
@@ -189,13 +213,92 @@ function displayAdminCourses(courses) {
 
 // Edit Course
 async function editCourse(courseId) {
-    // TODO: Implement edit course functionality
-    showToast('Edit functionality coming soon!', 'info');
+    showLoading();
+    try {
+        // First, get the course details
+        const response = await axios.get(`${API_BASE_URL}/admin/course/${courseId}`, {
+            headers: { token: localStorage.getItem('adminToken') }
+        });
+        const course = response.data.course;
+
+        // Create and show the edit modal
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Edit Course</h2>
+                <form id="editCourseForm">
+                    <div class="form-group">
+                        <label for="editCourseTitle">Title</label>
+                        <input type="text" id="editCourseTitle" value="${course.title}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCourseDescription">Description</label>
+                        <textarea id="editCourseDescription" required>${course.description}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCourseImageUrl">Image URL</label>
+                        <input type="url" id="editCourseImageUrl" value="${course.imageUrl}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCoursePrice">Price (₹)</label>
+                        <input type="number" id="editCoursePrice" value="${course.price}" step="0.01" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </form>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        modal.style.display = 'block';
+
+        // Handle form submission
+        const editForm = document.getElementById('editCourseForm');
+        editForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+            try {
+                await axios.put(`${API_BASE_URL}/admin/course/${courseId}`, {
+                    title: document.getElementById('editCourseTitle').value,
+                    description: document.getElementById('editCourseDescription').value,
+                    imageUrl: document.getElementById('editCourseImageUrl').value,
+                    price: parseFloat(document.getElementById('editCoursePrice').value)
+                }, {
+                    headers: { token: localStorage.getItem('adminToken') }
+                });
+                showToast('Course updated successfully!');
+                modal.remove();
+                loadAdminCourses();
+            } catch (error) {
+                showToast(error.response?.data?.msg || 'Error updating course', 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Close modal functionality
+        const closeBtn = modal.querySelector('.close');
+        closeBtn.onclick = () => {
+            modal.remove();
+        };
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        };
+    } catch (error) {
+        showToast('Error loading course details', 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
 // Delete Course
 async function deleteCourse(courseId) {
-    if (!confirm('Are you sure you want to delete this course?')) return;
+    if (!confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
+        return;
+    }
     
     showLoading();
     try {
@@ -220,7 +323,61 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Navbar scroll effect
+window.addEventListener('scroll', () => {
+    const navbar = document.querySelector('.navbar');
+    if (window.scrollY > 50) {
+        navbar.classList.add('scrolled');
+    } else {
+        navbar.classList.remove('scrolled');
+    }
+});
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     updateAuthState();
+    
+    // Add active class to current nav link
+    const navLinks = document.querySelectorAll('.nav-links a');
+    navLinks.forEach(link => {
+        if (link.textContent.includes('Dashboard')) {
+            link.classList.add('active');
+        }
+    });
+    
+    // Hamburger menu toggle
+    if (hamburgerMenu) {
+        hamburgerMenu.addEventListener('click', () => {
+            hamburgerMenu.classList.toggle('active');
+            const navLinksEl = document.getElementById('navLinks');
+            if (navLinksEl) navLinksEl.classList.toggle('active');
+            if (navBackdrop) navBackdrop.classList.toggle('active');
+            document.body.classList.toggle('menu-open');
+        });
+    }
+    
+    // Backdrop click to close menu
+    if (navBackdrop) {
+        navBackdrop.addEventListener('click', () => {
+            if (hamburgerMenu) hamburgerMenu.classList.remove('active');
+            const navLinksEl = document.getElementById('navLinks');
+            if (navLinksEl) navLinksEl.classList.remove('active');
+            if (navBackdrop) navBackdrop.classList.remove('active');
+            document.body.classList.remove('menu-open');
+        });
+    }
+    
+    // Close mobile menu when a link is clicked
+    const navLinksElements = document.querySelectorAll('.nav-links a');
+    if (navLinksElements.length > 0) {
+        navLinksElements.forEach(link => {
+            link.addEventListener('click', () => {
+                if (hamburgerMenu) hamburgerMenu.classList.remove('active');
+                const navLinksEl = document.getElementById('navLinks');
+                if (navLinksEl) navLinksEl.classList.remove('active');
+                if (navBackdrop) navBackdrop.classList.remove('active');
+                document.body.classList.remove('menu-open');
+            });
+        });
+    }
 }); 

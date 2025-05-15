@@ -3,6 +3,8 @@ const API_BASE_URL = 'http://localhost:3001/api/v1';
 
 // DOM Elements
 const navLinks = document.getElementById('navLinks');
+const hamburgerMenu = document.getElementById('hamburgerMenu');
+const navBackdrop = document.getElementById('navBackdrop');
 const landingContent = document.getElementById('landingContent');
 const dashboardContent = document.getElementById('dashboardContent');
 const loadingSpinner = document.getElementById('loadingSpinner');
@@ -46,8 +48,9 @@ function updateAuthState() {
         // User is logged in
         navLinks.innerHTML = `
             <a href="#" class="active">Dashboard</a>
+            <a href="#courses" class="courses-link">Courses</a>
             <a href="#" id="logoutBtn">Logout</a>
-            <a href="admin.html" class="admin-link">Admin Dashboard</a>
+            <a href="admin.html" class="admin-link"><i class="fas fa-user-shield"></i> Admin</a>
         `;
         landingContent.style.display = 'none';
         dashboardContent.style.display = 'block';
@@ -57,15 +60,15 @@ function updateAuthState() {
         // User is not logged in
         navLinks.innerHTML = `
             <a href="#" class="active">Home</a>
-            <a href="#courses">Courses</a>
-            <a href="#" id="signinBtn">Sign In</a>
+            <a href="#courses" class="courses-link">Courses</a>
+            <a href="#" id="signinBtn" class="btn-primary">Sign In</a>
             <a href="#" id="signupBtn" class="btn-primary">Sign Up</a>
-            <a href="admin.html" class="admin-link">Admin Dashboard</a>
+            <a href="admin.html" class="admin-link"><i class="fas fa-user-shield"></i> Admin</a>
         `;
         landingContent.style.display = 'block';
         dashboardContent.style.display = 'none';
         loadFeaturedCourses();
-
+        
         // Add event listeners to the newly created buttons
         document.getElementById('signinBtn').addEventListener('click', (e) => {
             e.preventDefault();
@@ -76,6 +79,31 @@ function updateAuthState() {
             openModal(signupModal);
         });
     }
+
+    // Add click event listeners to all nav links for mobile menu
+    const navLinksElements = document.querySelectorAll('#navLinks a');
+    navLinksElements.forEach(link => {
+        link.addEventListener('click', (e) => {
+            // Only prevent default for links that need special handling
+            if (link.id === 'signinBtn' || link.id === 'signupBtn' || link.id === 'logoutBtn') {
+                e.preventDefault();
+            }
+            
+            // Close mobile menu
+            if (hamburgerMenu) hamburgerMenu.classList.remove('active');
+            const navLinksContainer = document.getElementById('navLinks');
+            if (navLinksContainer) navLinksContainer.classList.remove('active');
+            if (navBackdrop) navBackdrop.classList.remove('active');
+            document.body.classList.remove('menu-open');
+
+            // Handle special cases
+            if (link.id === 'logoutBtn') {
+                localStorage.removeItem('token');
+                updateAuthState();
+                showToast('Successfully logged out!');
+            }
+        });
+    });
 }
 
 // Modal Management
@@ -167,13 +195,18 @@ async function loadFeaturedCourses() {
 }
 
 function displayFeaturedCourses(courses) {
-    coursesGrid.innerHTML = courses.slice(0, 6).map(course => `
+    if (courses.length === 0) {
+        coursesGrid.innerHTML = '<p class="no-courses">No courses available at the moment.</p>';
+        return;
+    }
+    
+    coursesGrid.innerHTML = courses.map(course => `
         <div class="course-card">
             <img src="${course.imageUrl}" alt="${course.title}" class="course-image">
             <div class="course-content">
                 <h3 class="course-title">${course.title}</h3>
                 <p class="course-description">${course.description}</p>
-                <p class="course-price">$${course.price}</p>
+                <p class="course-price">₹${course.price}</p>
                 <button onclick="showCourseDetails('${course._id}')" class="btn-primary">
                     <i class="fas fa-info-circle"></i> Learn More
                 </button>
@@ -209,7 +242,7 @@ function displayPurchasedCourses(courses) {
             <div class="course-content">
                 <h3 class="course-title">${course.title}</h3>
                 <p class="course-description">${course.description}</p>
-                <p class="course-price">$${course.price}</p>
+                <p class="course-price">₹${course.price}</p>
                 <button class="btn-secondary">Start Learning</button>
             </div>
         </div>
@@ -236,7 +269,7 @@ function displayAvailableCourses(courses) {
             <div class="course-content">
                 <h3 class="course-title">${course.title}</h3>
                 <p class="course-description">${course.description}</p>
-                <p class="course-price">$${course.price}</p>
+                <p class="course-price">₹${course.price}</p>
                 <button onclick="purchaseCourse('${course._id}')" class="btn-primary">Purchase</button>
             </div>
         </div>
@@ -260,15 +293,6 @@ async function purchaseCourse(courseId) {
         hideLoading();
     }
 }
-
-// Logout
-document.addEventListener('click', (e) => {
-    if (e.target.id === 'logoutBtn') {
-        localStorage.removeItem('token');
-        updateAuthState();
-        showToast('Successfully logged out!');
-    }
-});
 
 // Get Started Button Click Handler
 document.getElementById('getStartedBtn').addEventListener('click', (e) => {
@@ -356,7 +380,7 @@ async function showCourseDetails(courseId) {
                             </div>
                         </div>
                         <div class="course-actions">
-                            <p class="course-price-large">$${course.price}</p>
+                            <p class="course-price-large">₹${course.price}</p>
                             <button onclick="purchaseCourse('${course._id}')" class="btn-primary">
                                 <i class="fas fa-shopping-cart"></i> Enroll Now
                             </button>
@@ -386,7 +410,51 @@ async function showCourseDetails(courseId) {
     }
 }
 
+// Navbar scroll effect
+window.addEventListener('scroll', () => {
+    const navbar = document.querySelector('.navbar');
+    if (window.scrollY > 50) {
+        navbar.classList.add('scrolled');
+    } else {
+        navbar.classList.remove('scrolled');
+    }
+});
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     updateAuthState();
+    
+    // Add active class to current nav link
+    const currentPath = window.location.pathname;
+    const navLinksElements = document.querySelectorAll('#navLinks a');
+    navLinksElements.forEach(link => {
+        const linkPath = link.getAttribute('href');
+        if ((currentPath === '/' || currentPath.includes('index.html')) && linkPath === '#') {
+            link.classList.add('active');
+        } else if (linkPath !== '#' && currentPath.includes(linkPath)) {
+            link.classList.add('active');
+        }
+    });
+    
+    // Hamburger menu toggle
+    if (hamburgerMenu) {
+        hamburgerMenu.addEventListener('click', () => {
+            hamburgerMenu.classList.toggle('active');
+            const navLinksContainer = document.getElementById('navLinks');
+            if (navLinksContainer) navLinksContainer.classList.toggle('active');
+            if (navBackdrop) navBackdrop.classList.toggle('active');
+            document.body.classList.toggle('menu-open');
+        });
+    }
+    
+    // Backdrop click to close menu
+    if (navBackdrop) {
+        navBackdrop.addEventListener('click', () => {
+            if (hamburgerMenu) hamburgerMenu.classList.remove('active');
+            const navLinksContainer = document.getElementById('navLinks');
+            if (navLinksContainer) navLinksContainer.classList.remove('active');
+            if (navBackdrop) navBackdrop.classList.remove('active');
+            document.body.classList.remove('menu-open');
+        });
+    }
 });

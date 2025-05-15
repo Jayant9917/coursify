@@ -50,7 +50,9 @@ CourseRouter.post("/purchase", userMiddleware, async (req, res) => {
 
 CourseRouter.get("/preview", async (req, res) => {
     try {
+        // Find all courses regardless of whether they have a creatorId or not
         const courses = await courseModel.find({});
+        console.log("Preview endpoint - Found courses:", courses.length);
         res.json({
             courses
         });
@@ -58,6 +60,23 @@ CourseRouter.get("/preview", async (req, res) => {
         console.error(error);
         res.status(500).json({
             msg: "Something went wrong while fetching courses"
+        });
+    }
+});
+
+// Debug endpoint to list all courses
+CourseRouter.get("/debug", async (req, res) => {
+    try {
+        const courses = await courseModel.find({});
+        console.log("All courses in DB:", courses);
+        res.json({
+            count: courses.length,
+            courses: courses
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Something went wrong"
         });
     }
 });

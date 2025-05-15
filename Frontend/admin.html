@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coursify Admin Dashboard</title>
+    <title>Coursify Admin - Course Management Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -12,13 +15,22 @@
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-brand">
-            <h1>Coursify Admin</h1>
+            <a href="index.html"><h1>Coursify Admin</h1></a>
+        </div>
+        <div class="hamburger-menu" id="hamburgerMenu">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
         </div>
         <div class="nav-links" id="navLinks">
+            <a href="index.html">Home</a>
             <a href="#" class="active">Dashboard</a>
             <a href="#" id="logoutBtn">Logout</a>
         </div>
     </nav>
+    
+    <!-- Mobile Menu Backdrop -->
+    <div class="nav-backdrop" id="navBackdrop"></div>
 
     <!-- Loading Spinner -->
     <div id="loadingSpinner" class="spinner"></div>
@@ -104,6 +116,51 @@
             <div class="section">
                 <h2>Your Courses</h2>
                 <div id="adminCourses" class="courses-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Welcome Content (shown when not logged in) -->
+    <div id="adminWelcome">
+        <div class="admin-welcome-container">
+            <div class="admin-welcome-header">
+                <h1>Welcome to Coursify Admin</h1>
+                <p>The powerful course management platform for educators and content creators</p>
+            </div>
+            
+            <div class="admin-features">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-plus-circle"></i>
+                    </div>
+                    <h3>Create Courses</h3>
+                    <p>Easily build and publish professional courses with our intuitive content management system.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Track Performance</h3>
+                    <p>Monitor enrollments, student progress, and revenue with comprehensive analytics.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h3>Manage Students</h3>
+                    <p>Track student engagement, provide feedback, and build your education community.</p>
+                </div>
+            </div>
+            
+            <div class="admin-cta">
+                <h2>Ready to start creating?</h2>
+                <p>Sign in to your admin account or create a new one to get started.</p>
+                <div class="cta-buttons">
+                    <button id="welcomeSigninBtn" class="btn-primary">Sign In</button>
+                    <button id="welcomeSignupBtn" class="btn-secondary">Create Account</button>
+                </div>
             </div>
         </div>
     </div>

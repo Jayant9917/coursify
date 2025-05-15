@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coursify - Learn Without Limits</title>
+    <title>Coursify - Premium Online Learning Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -12,21 +15,32 @@
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-brand">
-            <h1>Coursify</h1>
+            <a href="index.html"><h1>Coursify</h1></a>
+        </div>
+        <div class="hamburger-menu" id="hamburgerMenu">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
         </div>
         <div class="nav-links" id="navLinks">
             <a href="#" class="active">Home</a>
             <a href="#courses">Courses</a>
             <a href="#" id="signinBtn">Sign In</a>
             <a href="#" id="signupBtn" class="btn-primary">Sign Up</a>
-            <a href="admin.html" class="admin-link">Admin Dashboard</a>
+            <a href="admin.html" class="admin-link"><i class="fas fa-user-shield"></i> Admin</a>
         </div>
     </nav>
+    
+    <!-- Mobile Menu Backdrop -->
+    <div class="nav-backdrop" id="navBackdrop"></div>
 
     <!-- Landing Page Content (shown when not logged in) -->
     <div id="landingContent">
         <!-- Hero Section -->
         <section class="hero">
+            <div class="hero-circle hero-circle-1"></div>
+            <div class="hero-circle hero-circle-2"></div>
+            <div class="hero-circle hero-circle-3"></div>
             <div class="hero-content">
                 <h1>Learn Without Limits</h1>
                 <p>Transform your future with expert-led courses. Join thousands of learners worldwide and unlock your potential with Coursify's comprehensive learning platform.</p>

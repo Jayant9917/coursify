@@ -130,13 +130,14 @@ adminRouter.post("/course", adminMiddleware, async (req, res) => {
 });
 
 // Update a course in DB
-adminRouter.put("/course", adminMiddleware, async (req, res) => {
+adminRouter.put("/course/:courseId", adminMiddleware, async (req, res) => {
     try {
         const adminId = req.userId;
-        const { title, description, imageUrl, price, courseId } = req.body;
+        const courseId = req.params.courseId;
+        const { title, description, imageUrl, price } = req.body;
 
         // Validate course data
-        if (!title || !description || !price || !courseId) {
+        if (!title || !description || !price) {
             return res.status(400).json({
                 msg: "Missing required fields"
             });
@@ -155,7 +156,7 @@ adminRouter.put("/course", adminMiddleware, async (req, res) => {
         });
 
         if (!course) {
-            return res.status(403).json({
+            return res.status(404).json({
                 msg: "Course not found or you don't have permission to update it"
             });
         }
@@ -193,12 +194,91 @@ adminRouter.get("/course/bulk", adminMiddleware, async(req, res) => {
         });
         res.json({
             msg: "Courses retrieved successfully",
-            courses
+            courses: courses || []
         });
     } catch (error) {
         console.error(error);
         res.status(500).json({
             msg: "Something went wrong while fetching courses"
+        });
+    }
+});
+
+// Get all courses for admin view
+adminRouter.get("/courses/all", adminMiddleware, async(req, res) => {
+    try {
+        const courses = await courseModel.find({});
+        res.json({
+            msg: "All courses retrieved successfully",
+            courses
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Something went wrong while fetching all courses"
+        });
+    }
+});
+
+// Get a single course
+adminRouter.get("/course/:courseId", adminMiddleware, async (req, res) => {
+    try {
+        const adminId = req.userId;
+        const courseId = req.params.courseId;
+
+        const course = await courseModel.findOne({
+            _id: courseId,
+            creatorId: adminId
+        });
+
+        if (!course) {
+            return res.status(404).json({
+                msg: "Course not found or you don't have permission to access it"
+            });
+        }
+
+        res.json({
+            msg: "Course retrieved successfully",
+            course
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Something went wrong while fetching course"
+        });
+    }
+});
+
+// Delete a course
+adminRouter.delete("/course/:courseId", adminMiddleware, async (req, res) => {
+    try {
+        const adminId = req.userId;
+        const courseId = req.params.courseId;
+
+        // Check if course exists and belongs to admin
+        const course = await courseModel.findOne({
+            _id: courseId,
+            creatorId: adminId
+        });
+
+        if (!course) {
+            return res.status(404).json({
+                msg: "Course not found or you don't have permission to delete it"
+            });
+        }
+
+        await courseModel.deleteOne({
+            _id: courseId,
+            creatorId: adminId
+        });
+
+        res.json({
+            msg: "Course deleted successfully"
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Something went wrong while deleting course"
         });
     }
 });
