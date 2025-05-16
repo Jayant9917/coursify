@@ -16,7 +16,7 @@ app.use(cors({
         'http://localhost:5500', 
         'http://127.0.0.1:5500', 
         'https://coursify-repw.onrender.com',
-        'https://coursify-frontend.onrender.com'  // Add this when you deploy frontend
+        'https://coursify-frontend-f90i.onrender.com'  // Your new frontend URL
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'token'],
