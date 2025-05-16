@@ -1,6 +1,6 @@
 const { Router } = require("express");
 const adminRouter = Router();
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { z } = require("zod");
 const { adminModel, courseModel } = require("../db")

@@ -8,7 +8,7 @@ const { CourseRouter } = require("./routers/course");
 const { adminRouter } = require("./routers/admin");
 
 const app = express();
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 3002;
 
 // CORS configuration
 app.use(cors({
@@ -29,11 +29,25 @@ async function main() {
     try {
         await mongoose.connect(process.env.MONGODB_URL);
         console.log("Connected to MongoDB");
-        app.listen(port, () => {
-            console.log("Server is running on " + port);
+        
+        const server = app.listen(port, () => {
+            console.log("Server is running on port " + port);
         });
+
+        // Handle server errors
+        server.on('error', (error) => {
+            if (error.code === 'EADDRINUSE') {
+                console.error(`Port ${port} is already in use. Please try a different port or close the application using this port.`);
+                process.exit(1);
+            } else {
+                console.error('Server error:', error);
+            }
+        });
+
     } catch (err) {
         console.error("MongoDB connection error:", err);
+        process.exit(1);
     }
 }
+
 main();
