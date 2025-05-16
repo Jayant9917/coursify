@@ -12,7 +12,12 @@ const port = process.env.PORT || 3002;
 
 // CORS configuration
 app.use(cors({
-    origin: ['http://localhost:5500', 'http://127.0.0.1:5500', 'https://coursify.onrender.com'],
+    origin: [
+        'http://localhost:5500', 
+        'http://127.0.0.1:5500', 
+        'https://coursify-repw.onrender.com',
+        'https://coursify-frontend.onrender.com'  // Add this when you deploy frontend
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'token'],
     credentials: true

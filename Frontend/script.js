@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = 'http://localhost:3002/api/v1';
+const API_BASE_URL = 'https://coursify-repw.onrender.com/api/v1';
 
 // DOM Elements
 const navLinks = document.getElementById('navLinks');
