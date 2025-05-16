@@ -1,5 +1,5 @@
 // Validate required environment variables
-const requiredEnvVars = ['JWT_USER_PASSWORD', 'JWT_ADMIN_PASSWORD'];
+const requiredEnvVars = ['MONGODB_URL', 'JWT_USER_PASSWORD', 'JWT_ADMIN_PASSWORD'];
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
