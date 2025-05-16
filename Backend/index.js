@@ -12,13 +12,26 @@ const port = process.env.PORT || 3002;
 
 // CORS configuration
 app.use(cors({
-    origin: '*',  // Allow all origins temporarily for initial deployment
+    origin: ['http://localhost:5500', 'http://127.0.0.1:5500', 'https://coursify.onrender.com'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'token'],
     credentials: true
 }));
 
 app.use(express.json());
+
+// Root route
+app.get('/', (req, res) => {
+    res.json({
+        message: "Welcome to Coursify API",
+        status: "Server is running",
+        endpoints: {
+            user: "/api/v1/user",
+            course: "/api/v1/course",
+            admin: "/api/v1/admin"
+        }
+    });
+});
 
 // Routes
 app.use("/api/v1/user", UserRouter);
