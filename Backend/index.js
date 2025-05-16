@@ -8,11 +8,11 @@ const { CourseRouter } = require("./routers/course");
 const { adminRouter } = require("./routers/admin");
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 
 // CORS configuration
 app.use(cors({
-    origin: ['http://localhost:5500', 'http://127.0.0.1:5500'], // Add your frontend URLs
+    origin: '*',  // Allow all origins temporarily for initial deployment
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'token'],
     credentials: true
