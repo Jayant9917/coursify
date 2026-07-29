@@ -58,9 +58,13 @@ const courseSchema = new Schema(
     tags: { type: [String], default: [] },
     isPublished: { type: Boolean, default: false },
     isFeatured: { type: Boolean, default: false },
+    isArchived: { type: Boolean, default: false, index: true },
     ratingAvg: { type: Number, default: 0 },
     ratingCount: { type: Number, default: 0 },
     enrollmentCount: { type: Number, default: 0 },
+    // null means unlimited. reservedSeats is maintained transactionally with checkout reservations.
+    maxSeats: { type: Number, default: null, min: 1 },
+    reservedSeats: { type: Number, default: 0, min: 0, select: false },
   },
   { timestamps: true }
 );
@@ -132,6 +136,8 @@ const orderSchema = new Schema(
     resourceType: { type: String, enum: ["course", "note"], default: "course", index: true },
     paymentProvider: { type: String, default: "manual" },
     paymentIntentId: { type: String, default: "" },
+    checkoutUrl: { type: String, default: "" },
+    expiresAt: { type: Date, default: null, index: true },
     couponCode: { type: String, default: "" },
     couponReservationExpiresAt: { type: Date, default: null },
     couponReservationReleased: { type: Boolean, default: false },
@@ -141,6 +147,32 @@ const orderSchema = new Schema(
 );
 
 orderSchema.index({ userId: 1, createdAt: -1 });
+
+const courseSeatReservationSchema = new Schema(
+  {
+    courseId: { type: ObjectId, required: true, index: true },
+    userId: { type: ObjectId, required: true, index: true },
+    orderId: { type: ObjectId, required: true, index: true },
+    status: {
+      type: String,
+      enum: ["reserved", "completed", "expired", "cancelled"],
+      default: "reserved",
+      index: true,
+    },
+    provider: { type: String, default: "lemon_squeezy" },
+    checkoutId: { type: String, default: "" },
+    expiresAt: { type: Date, required: true, index: true },
+    completedAt: { type: Date, default: null },
+    releasedAt: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
+
+courseSeatReservationSchema.index({ orderId: 1, courseId: 1 }, { unique: true });
+courseSeatReservationSchema.index(
+  { courseId: 1, userId: 1 },
+  { unique: true, partialFilterExpression: { status: "reserved" } }
+);
 
 const orderItemSchema = new Schema(
   {
@@ -310,6 +342,7 @@ const webhookDeliverySchema = new Schema(
     attempts: { type: Number, default: 0, min: 0 },
     responseStatus: { type: Number, default: null },
     lastError: { type: String, default: "" },
+    payloadSnapshot: { type: Schema.Types.Mixed, default: null },
     receivedAt: { type: Date, default: Date.now },
     processedAt: { type: Date, default: null },
   },
@@ -358,6 +391,40 @@ const notePurchaseSchema = new Schema(
 
 notePurchaseSchema.index({ userId: 1, noteId: 1 }, { unique: true });
 
+const auditLogSchema = new Schema(
+  {
+    actorId: { type: ObjectId, default: null, index: true },
+    actorRole: { type: String, default: "system", index: true },
+    action: { type: String, required: true, trim: true, index: true },
+    resourceType: { type: String, required: true, trim: true, index: true },
+    resourceId: { type: String, default: "", index: true },
+    metadata: { type: Schema.Types.Mixed, default: {} },
+    requestId: { type: String, default: "", index: true },
+    ip: { type: String, default: "" },
+    userAgent: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+const mediaUploadSchema = new Schema(
+  {
+    userId: { type: ObjectId, required: true, index: true },
+    provider: { type: String, enum: ["s3"], required: true, default: "s3" },
+    uploadId: { type: String, required: true, unique: true, index: true },
+    key: { type: String, required: true },
+    folder: { type: String, required: true },
+    contentType: { type: String, required: true },
+    status: { type: String, enum: ["initiated", "completed", "aborted"], default: "initiated", index: true },
+    expiresAt: { type: Date, required: true },
+  },
+  { timestamps: true }
+);
+
+mediaUploadSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+auditLogSchema.index({ createdAt: -1 });
+auditLogSchema.index({ resourceType: 1, resourceId: 1, createdAt: -1 });
+
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 const Category = mongoose.models.Category || mongoose.model("Category", categorySchema);
 const Course = mongoose.models.Course || mongoose.model("Course", courseSchema);
@@ -366,6 +433,8 @@ const Lesson = mongoose.models.Lesson || mongoose.model("Lesson", lessonSchema);
 const Enrollment = mongoose.models.Enrollment || mongoose.model("Enrollment", enrollmentSchema);
 const Order = mongoose.models.Order || mongoose.model("Order", orderSchema);
 const OrderItem = mongoose.models.OrderItem || mongoose.model("OrderItem", orderItemSchema);
+const CourseSeatReservation =
+  mongoose.models.CourseSeatReservation || mongoose.model("CourseSeatReservation", courseSeatReservationSchema);
 const Review = mongoose.models.Review || mongoose.model("Review", reviewSchema);
 const Wishlist = mongoose.models.Wishlist || mongoose.model("Wishlist", wishlistSchema);
 const CourseProgress = mongoose.models.CourseProgress || mongoose.model("CourseProgress", courseProgressSchema);
@@ -381,6 +450,8 @@ const PasswordResetToken =
 const WebhookDelivery = mongoose.models.WebhookDelivery || mongoose.model("WebhookDelivery", webhookDeliverySchema);
 const Note = mongoose.models.Note || mongoose.model("Note", noteSchema);
 const NotePurchase = mongoose.models.NotePurchase || mongoose.model("NotePurchase", notePurchaseSchema);
+const AuditLog = mongoose.models.AuditLog || mongoose.model("AuditLog", auditLogSchema);
+const MediaUpload = mongoose.models.MediaUpload || mongoose.model("MediaUpload", mediaUploadSchema);
 
 module.exports = {
   User,
@@ -391,6 +462,7 @@ module.exports = {
   Enrollment,
   Order,
   OrderItem,
+  CourseSeatReservation,
   Review,
   Wishlist,
   CourseProgress,
@@ -403,4 +475,6 @@ module.exports = {
   WebhookDelivery,
   Note,
   NotePurchase,
+  AuditLog,
+  MediaUpload,
 };

@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const config = require("../config");
 const ApiError = require("../utils/apiError");
 const { log } = require("../utils/logger");
+const { recordAudit } = require("../utils/audit");
 const slugify = require("../utils/slugify");
 const paginate = require("../utils/paginate");
 const {
@@ -21,6 +22,7 @@ const {
   deleteResetTokensByUserId,
 } = require("../utils/passwordResetStore");
 const { createPresignedGetUrl } = require("../utils/s3");
+const { isEmailConfigured, sendPasswordResetEmail } = require("../utils/email");
 const { getOrSetJson } = require("../utils/cache");
 const {
   createCheckout: createLemonSqueezyCheckout,
@@ -36,6 +38,7 @@ const {
   Enrollment,
   Order,
   OrderItem,
+  CourseSeatReservation,
   Review,
   Wishlist,
   CourseProgress,
@@ -44,20 +47,33 @@ const {
   WebhookDelivery,
   Note,
   NotePurchase,
+  AuditLog,
 } = require("../models");
 
-const runDatabaseTransaction = async (callback) => {
-  const session = await mongoose.startSession();
-  let result;
+const isTransientTransactionError = (error) =>
+  error?.hasErrorLabel?.("TransientTransactionError") ||
+  error?.hasErrorLabel?.("UnknownTransactionCommitResult") ||
+  error?.code === 112 ||
+  error?.codeName === "WriteConflict";
 
-  try {
-    await session.withTransaction(async () => {
-      result = await callback(session);
-    });
-    return result;
-  } finally {
-    await session.endSession();
+const runDatabaseTransaction = async (callback) => {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const session = await mongoose.startSession();
+    let result;
+
+    try {
+      await session.withTransaction(async () => {
+        result = await callback(session);
+      });
+      return result;
+    } catch (error) {
+      if (!isTransientTransactionError(error) || attempt === 2) throw error;
+    } finally {
+      await session.endSession();
+    }
   }
+
+  throw new Error("Database transaction could not be completed");
 };
 
 const sanitizeUser = (user) => {
@@ -111,15 +127,6 @@ const ensureRoleAllowed = (role) => {
 
 const isOwnerOrAdmin = (actor, ownerId) =>
   actor?.role === "admin" || String(actor?.id) === String(ownerId);
-
-const getCourseByIdentifier = async (identifier, bySlug = false) => {
-  const query = bySlug ? { slug: identifier } : { _id: identifier };
-  const course = await Course.findOne(query);
-  if (!course) {
-    throw new ApiError(404, "Course not found");
-  }
-  return course;
-};
 
 const upsertNotification = async ({ userId, type, title, message }) => {
   return Notification.create({ userId, type, title, message });
@@ -299,6 +306,7 @@ const pickCourseUpdates = (payload) => {
     "tags",
     "isPublished",
     "isFeatured",
+    "maxSeats",
   ];
 
   fields.forEach((field) => {
@@ -478,7 +486,7 @@ const finalizeCouponRedemption = async (order, session) => {
   return coupon;
 };
 
-const ensureOrderEnrollments = async (order, session) => {
+const ensureOrderEnrollments = async (order, session, paymentTime = new Date()) => {
   const orderItemsQuery = OrderItem.find({ orderId: order._id });
   if (session) orderItemsQuery.session(session);
   const orderItems = await orderItemsQuery;
@@ -490,11 +498,26 @@ const ensureOrderEnrollments = async (order, session) => {
     const existingEnrollment = await enrollmentQuery;
     if (existingEnrollment) {
       if (existingEnrollment.status === "refunded") {
+        await consumeCourseSeat({
+          courseId: item.courseId,
+          userId: order.userId,
+          orderId: order._id,
+          paymentTime,
+          session,
+        });
         existingEnrollment.status = existingEnrollment.progressPercent === 100 ? "completed" : "active";
         await existingEnrollment.save(session ? { session } : undefined);
       }
       continue;
     }
+
+    await consumeCourseSeat({
+      courseId: item.courseId,
+      userId: order.userId,
+      orderId: order._id,
+      paymentTime,
+      session,
+    });
 
     await Enrollment.findOneAndUpdate(
       { userId: order.userId, courseId: item.courseId },
@@ -510,11 +533,6 @@ const ensureOrderEnrollments = async (order, session) => {
       { new: true, upsert: true, ...(session ? { session } : {}) }
     );
 
-    await Course.updateOne(
-      { _id: item.courseId },
-      { $inc: { enrollmentCount: 1 } },
-      session ? { session } : undefined
-    );
   }
 };
 
@@ -526,13 +544,24 @@ const revokeOrderEnrollments = async (order, session) => {
 
   if (courseIds.length === 0) return;
 
-  await Enrollment.updateMany(
-    {
-      userId: order.userId,
-      courseId: { $in: courseIds },
-      status: { $in: ["active", "completed"] },
-    },
-    { $set: { status: "refunded" } },
+  for (const courseId of courseIds) {
+    const result = await Enrollment.updateOne(
+      { userId: order.userId, courseId, status: { $in: ["active", "completed"] } },
+      { $set: { status: "refunded" } },
+      session ? { session } : undefined
+    );
+    if (result.modifiedCount === 1) {
+      await Course.updateOne(
+        { _id: courseId, enrollmentCount: { $gt: 0 } },
+        { $inc: { enrollmentCount: -1 } },
+        session ? { session } : undefined
+      );
+    }
+  }
+
+  await CourseSeatReservation.updateMany(
+    { orderId: order._id, status: "completed" },
+    { $set: { status: "cancelled", releasedAt: new Date() } },
     session ? { session } : undefined
   );
 };
@@ -589,6 +618,7 @@ const markOrderFailed = async (orderId) => {
     if (!order) return;
 
     await releaseOrderCouponReservation(order, session);
+    await releaseOrderSeatReservations(order, session);
     await Order.updateOne(
       { _id: order._id, status: "pending" },
       { $set: { status: "failed" } },
@@ -597,8 +627,129 @@ const markOrderFailed = async (orderId) => {
   });
 };
 
+const getProviderPaymentTime = (payload) => {
+  const value = payload?.attributes?.paid_at || payload?.attributes?.created_at || payload?.attributes?.updated_at;
+  const timestamp = value ? new Date(value) : new Date();
+  return Number.isNaN(timestamp.getTime()) ? new Date() : timestamp;
+};
+
+const reserveCourseSeats = async ({ courses, userId, orderId, expiresAt, session }) => {
+  for (const course of courses) {
+    if (course.maxSeats === null || course.maxSeats === undefined) continue;
+
+    const existingReservation = await CourseSeatReservation.findOne({
+      courseId: course._id,
+      userId,
+      status: "reserved",
+    }).session(session);
+    if (existingReservation) {
+      throw new ApiError(409, "You already have an active checkout for one of these courses");
+    }
+
+    const reservedCourse = await Course.findOneAndUpdate(
+      {
+        _id: course._id,
+        isPublished: true,
+        isArchived: { $ne: true },
+        $expr: {
+          $lt: [
+            { $add: [{ $ifNull: ["$enrollmentCount", 0] }, { $ifNull: ["$reservedSeats", 0] }] },
+            "$maxSeats",
+          ],
+        },
+      },
+      { $inc: { reservedSeats: 1 } },
+      { new: true, session }
+    );
+
+    if (!reservedCourse) {
+      throw new ApiError(409, "One of the selected courses has just sold out");
+    }
+
+    await CourseSeatReservation.create(
+      [{ courseId: course._id, userId, orderId, expiresAt, status: "reserved" }],
+      { session }
+    );
+  }
+};
+
+const consumeCourseSeat = async ({ courseId, userId, orderId, paymentTime, session }) => {
+  const reservation = await CourseSeatReservation.findOne({ courseId, orderId, userId }).session(session);
+
+  if (reservation?.status === "completed") return;
+  if (reservation && reservation.status !== "reserved") {
+    throw new ApiError(409, "The course seat reservation is no longer active");
+  }
+  if (reservation && paymentTime > reservation.expiresAt) {
+    throw new ApiError(409, "Payment was received after the course seat reservation expired");
+  }
+
+  if (reservation) {
+    const completed = await CourseSeatReservation.findOneAndUpdate(
+      { _id: reservation._id, status: "reserved" },
+      { $set: { status: "completed", completedAt: new Date() } },
+      { new: true, session }
+    );
+    if (!completed) throw new ApiError(409, "The course seat reservation could not be confirmed");
+
+    const result = await Course.updateOne(
+      { _id: courseId, reservedSeats: { $gt: 0 } },
+      { $inc: { reservedSeats: -1, enrollmentCount: 1 } },
+      { session }
+    );
+    if (result.modifiedCount !== 1) throw new ApiError(409, "The reserved course seat is no longer available");
+    return;
+  }
+
+  const course = await Course.findById(courseId).select("+reservedSeats").session(session);
+  if (!course) throw new ApiError(404, "Course not found");
+  if (course.maxSeats === null || course.maxSeats === undefined) {
+    await Course.updateOne({ _id: courseId }, { $inc: { enrollmentCount: 1 } }, { session });
+    return;
+  }
+
+  const confirmed = await Course.findOneAndUpdate(
+    {
+      _id: courseId,
+      $expr: {
+        $lt: [
+          { $add: [{ $ifNull: ["$enrollmentCount", 0] }, { $ifNull: ["$reservedSeats", 0] }] },
+          "$maxSeats",
+        ],
+      },
+    },
+    { $inc: { enrollmentCount: 1 } },
+    { new: true, session }
+  );
+  if (!confirmed) throw new ApiError(409, "The course is currently sold out");
+};
+
+const releaseOrderSeatReservations = async (order, session, status = "expired") => {
+  const reservations = await CourseSeatReservation.find({ orderId: order._id, status: "reserved" }).session(session);
+  for (const reservation of reservations) {
+    const released = await CourseSeatReservation.findOneAndUpdate(
+      { _id: reservation._id, status: "reserved" },
+      { $set: { status, releasedAt: new Date() } },
+      { new: true, session }
+    );
+    if (released) {
+      await Course.updateOne({ _id: reservation.courseId, reservedSeats: { $gt: 0 } }, { $inc: { reservedSeats: -1 } }, { session });
+    }
+  }
+};
+
+const expirePendingOrders = async () => {
+  const expiredOrders = await Order.find({
+    status: "pending",
+    expiresAt: { $ne: null, $lte: new Date() },
+  }).select("_id").lean();
+
+  await Promise.all(expiredOrders.map((order) => markOrderFailed(order._id)));
+  return expiredOrders.length;
+};
+
 const courseSearchFilter = (query) => {
-  const filter = { isPublished: true };
+  const filter = { isPublished: true, isArchived: { $ne: true } };
 
   if (query.categoryId) filter.categoryId = query.categoryId;
   if (query.level) filter.level = query.level;
@@ -715,13 +866,32 @@ const authService = {
       expiresAt,
     });
 
+    const resetUrl = `${String(config.frontendUrl || "").replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
+
+    if (isEmailConfigured()) {
+      try {
+        await sendPasswordResetEmail({ email: normalizedEmail, resetUrl });
+      } catch (error) {
+        await deleteResetTokensByUserId(user._id);
+        log("error", "email.password_reset_failed", {
+          userId: user._id.toString(),
+          error: { name: error?.name, message: error?.message },
+        });
+        throw new ApiError(503, "Password reset email could not be sent. Please try again later.");
+      }
+
+      return {
+        message: "If the account exists, a password reset link has been sent.",
+      };
+    }
+
     const response = {
-      message: "Password reset link generated.",
+      message: "If the account exists, a password reset link has been generated.",
     };
 
-    if (process.env.NODE_ENV !== "production") {
+    if (process.env.NODE_ENV !== "production" && config.emailProvider === "console") {
       response.resetToken = token;
-      response.resetUrl = `/reset-password?token=${token}`;
+      response.resetUrl = resetUrl;
     }
 
     return response;
@@ -793,7 +963,7 @@ const userService = {
     return sanitizeUser(user);
   },
 
-  async updateStatus(actor, id, status) {
+  async updateStatus(actor, id, status, request) {
     if (String(actor.id) === String(id) && status === "blocked") {
       throw new ApiError(400, "You cannot block your own admin account");
     }
@@ -808,16 +978,27 @@ const userService = {
       }
     }
 
+    const previousStatus = userToUpdate.status;
     const user = await User.findByIdAndUpdate(id, { status }, { new: true });
     if (!user) throw new ApiError(404, "User not found");
     if (status === "blocked") await deleteTokensByUserId(id);
+    if (previousStatus !== status) {
+      await recordAudit({
+        actor,
+        action: "user.status_changed",
+        resourceType: "user",
+        resourceId: id,
+        metadata: { from: previousStatus, to: status },
+        request,
+      });
+    }
     return sanitizeUser(user);
   },
 };
 
 const courseService = {
   async listPublic(query) {
-    const cacheKey = `catalog:courses:${JSON.stringify({
+    const cacheKey = `catalog:courses:v2:${JSON.stringify({
       page: query.page || 1,
       limit: query.limit || 12,
       categoryId: query.categoryId || "",
@@ -836,7 +1017,7 @@ const courseService = {
   },
 
   async getPublicBySlug(slug) {
-    const course = await Course.findOne({ slug, isPublished: true });
+    const course = await Course.findOne({ slug, isPublished: true, isArchived: { $ne: true } });
     if (!course) throw new ApiError(404, "Course not found");
 
     const sections = await CourseSection.find({ courseId: course._id }).sort({ order: 1 });
@@ -874,19 +1055,26 @@ const courseService = {
       tags: payload.tags || [],
       isPublished: Boolean(payload.isPublished),
       isFeatured: Boolean(payload.isFeatured),
+      maxSeats: payload.maxSeats === undefined ? null : payload.maxSeats,
     });
 
     return course;
   },
 
   async update(actor, courseId, payload) {
-    const course = await Course.findById(courseId);
+    const course = await Course.findById(courseId).select("+reservedSeats");
     if (!course) throw new ApiError(404, "Course not found");
     if (!isOwnerOrAdmin(actor, course.instructorId)) {
       throw new ApiError(403, "You cannot edit this course");
     }
 
     const updates = pickCourseUpdates(payload);
+    if (payload.maxSeats !== undefined) {
+      const occupiedSeats = Number(course.enrollmentCount || 0) + Number(course.reservedSeats || 0);
+      if (payload.maxSeats !== null && Number(payload.maxSeats) < occupiedSeats) {
+        throw new ApiError(400, `Capacity cannot be lower than ${occupiedSeats} occupied or reserved seats`);
+      }
+    }
     if (payload.title && payload.title !== course.title) {
       const baseSlug = slugify(payload.title);
       let slug = baseSlug;
@@ -906,18 +1094,9 @@ const courseService = {
     if (actor.role !== "admin") {
       throw new ApiError(403, "Only admins can delete courses");
     }
-    const course = await Course.findByIdAndDelete(courseId);
+    const course = await Course.findById(courseId);
     if (!course) throw new ApiError(404, "Course not found");
-    await Promise.all([
-      CourseSection.deleteMany({ courseId }),
-      Lesson.deleteMany({ courseId }),
-      Enrollment.deleteMany({ courseId }),
-      Review.deleteMany({ courseId }),
-      Wishlist.deleteMany({ courseId }),
-      CourseProgress.deleteMany({ courseId }),
-      OrderItem.deleteMany({ courseId }),
-    ]);
-    return course;
+    return Course.findByIdAndUpdate(courseId, { isArchived: true, isPublished: false }, { new: true });
   },
 
   async publish(actor, courseId, isPublished) {
@@ -943,6 +1122,17 @@ const courseService = {
 
   async instructorCourses(instructorId, query) {
     return paginate(Course, { instructorId }, { page: query.page, limit: query.limit, sort: { createdAt: -1 } });
+  },
+
+  async instructorCourseDetails(actor, courseId) {
+    const course = await Course.findById(courseId);
+    if (!course) throw new ApiError(404, "Course not found");
+    if (!isOwnerOrAdmin(actor, course.instructorId)) throw new ApiError(403, "You cannot view this course");
+    const [sections, lessons] = await Promise.all([
+      CourseSection.find({ courseId }).sort({ order: 1 }),
+      Lesson.find({ courseId }).sort({ order: 1 }),
+    ]);
+    return { course, sections, lessons };
   },
 
   async instructorStats(instructorId) {
@@ -1056,7 +1246,8 @@ const lessonService = {
       type: payload.type,
       content: payload.content || "",
       videoUrl: payload.videoUrl || "",
-      fileKey: payload.fileKey || payload.fileUrl || "",
+      fileUrl: payload.fileUrl || "",
+      fileKey: payload.fileKey || "",
       duration: payload.duration || 0,
       isPreview: Boolean(payload.isPreview),
       order: payload.order || lessonCount + 1,
@@ -1087,38 +1278,42 @@ const enrollmentService = {
       throw new ApiError(403, "Only students can enroll in courses");
     }
 
-    const course = await Course.findById(payload.courseId);
-    if (!course || !course.isPublished) throw new ApiError(404, "Course not found");
+    return runDatabaseTransaction(async (session) => {
+      const course = await Course.findById(payload.courseId).select("+reservedSeats").session(session);
+      if (!course || !course.isPublished || course.isArchived) throw new ApiError(404, "Course not found");
 
-    const existingEnrollment = await Enrollment.findOne({ userId: actor.id, courseId: payload.courseId });
-    if (existingEnrollment && existingEnrollment.status !== "refunded") {
-      return existingEnrollment;
-    }
+      const existingEnrollment = await Enrollment.findOne({ userId: actor.id, courseId: payload.courseId }).session(session);
+      if (existingEnrollment && existingEnrollment.status !== "refunded") return existingEnrollment;
 
-    const coursePrice = resolveCoursePrice(course);
-    if (coursePrice > 0 && !(await hasPaidOrderForCourse(actor.id, course._id))) {
-      throw new ApiError(402, "Payment is required before enrolling in this course");
-    }
+      const coursePrice = resolveCoursePrice(course);
+      if (coursePrice > 0 && !(await hasPaidOrderForCourse(actor.id, course._id))) {
+        throw new ApiError(402, "Payment is required before enrolling in this course");
+      }
 
-    const enrollment = await Enrollment.findOneAndUpdate(
-      { userId: actor.id, courseId: payload.courseId },
-      {
-        $set: {
-          status: existingEnrollment?.progressPercent === 100 ? "completed" : "active",
+      await consumeCourseSeat({
+        courseId: course._id,
+        userId: actor.id,
+        orderId: new mongoose.Types.ObjectId(),
+        paymentTime: new Date(),
+        session,
+      });
+
+      return Enrollment.findOneAndUpdate(
+        { userId: actor.id, courseId: payload.courseId },
+        {
+          $set: {
+            status: existingEnrollment?.progressPercent === 100 ? "completed" : "active",
+          },
+          $setOnInsert: {
+            userId: actor.id,
+            courseId: payload.courseId,
+            progressPercent: 0,
+            completedLessonIds: [],
+          },
         },
-        $setOnInsert: {
-          userId: actor.id,
-          courseId: payload.courseId,
-          status: "active",
-          progressPercent: 0,
-          completedLessonIds: [],
-        },
-      },
-      { new: true, upsert: true }
-    );
-
-    await Course.updateOne({ _id: payload.courseId }, { $inc: { enrollmentCount: 1 } });
-    return enrollment;
+        { new: true, upsert: true, session }
+      );
+    });
   },
 
   async myEnrollments(userId) {
@@ -1237,7 +1432,7 @@ const beginWebhookMonitoring = async ({ body, rawBody }) => {
     return await WebhookDelivery.findOneAndUpdate(
       { deliveryKey: context.deliveryKey },
       {
-        $set: { ...context, status: "received", lastError: "", receivedAt: new Date() },
+        $set: { ...context, payloadSnapshot: body, status: "received", lastError: "", receivedAt: new Date() },
         $inc: { attempts: 1 },
         $setOnInsert: { provider: "lemon_squeezy" },
       },
@@ -1273,6 +1468,26 @@ const failWebhookMonitoring = async (delivery, error) => {
   }
 };
 
+const findReusableCourseOrder = async (userId, courseIds) => {
+  if (courseIds.length === 0) return null;
+  const pendingOrders = await Order.find({
+    userId,
+    resourceType: "course",
+    status: "pending",
+    expiresAt: { $gt: new Date() },
+  }).sort({ createdAt: -1 });
+
+  const requested = new Set(courseIds.map(String));
+  for (const order of pendingOrders) {
+    const items = await OrderItem.find({ orderId: order._id, resourceType: "course" }).select("courseId").lean();
+    const itemIds = new Set(items.map((item) => String(item.courseId)));
+    if (itemIds.size === requested.size && [...requested].every((id) => itemIds.has(id))) {
+      return order;
+    }
+  }
+  return null;
+};
+
 const orderService = {
   async create(actor, payload) {
     if (actor.role !== "student") throw new ApiError(403, "Only students can place orders");
@@ -1283,11 +1498,26 @@ const orderService = {
     if (courseIds.length > 0 && noteIds.length > 0) throw new ApiError(400, "Courses and notes must be purchased separately");
 
     const resourceType = noteIds.length > 0 ? "note" : "course";
-    const courses = resourceType === "course" ? await Course.find({ _id: { $in: courseIds }, isPublished: true }) : [];
+    const courses = resourceType === "course" ? await Course.find({ _id: { $in: courseIds }, isPublished: true, isArchived: { $ne: true } }) : [];
     const notes = resourceType === "note" ? await Note.find({ _id: { $in: noteIds }, isPublished: true }) : [];
     const requestedCount = resourceType === "note" ? noteIds.length : courseIds.length;
     const resources = resourceType === "note" ? notes : courses;
     if (resources.length !== requestedCount) throw new ApiError(404, "One or more resources were not found");
+    if (resourceType === "course") {
+      const existingEnrollment = await Enrollment.findOne({
+        userId: actor.id,
+        courseId: { $in: courseIds },
+        status: { $in: ["active", "completed"] },
+      }).select("courseId").lean();
+      if (existingEnrollment) throw new ApiError(400, "You are already enrolled in one of the selected courses");
+
+      await expirePendingOrders();
+      const reusableOrder = await findReusableCourseOrder(actor.id, courseIds);
+      if (reusableOrder) {
+        if (!reusableOrder.checkoutUrl) throw new ApiError(409, "Your existing checkout is still being prepared");
+        return reusableOrder;
+      }
+    }
     if (resourceType === "note" && resources.some((note) => Number(note.price || 0) <= 0)) {
       throw new ApiError(400, "Free notes should be added to the vault instead of checked out");
     }
@@ -1297,6 +1527,7 @@ const orderService = {
       subtotal += resourceType === "note" ? Number(resource.price || 0) : resolveCoursePrice(resource);
     });
 
+    const checkoutExpiresAt = new Date(Date.now() + config.lemonSqueezyCheckoutTtlMinutes * 60 * 1000);
     const { order, amount, couponCode } = await runDatabaseTransaction(async (session) => {
       let discount = 0;
       let couponCode = "";
@@ -1324,12 +1555,23 @@ const orderService = {
           resourceType,
           paymentProvider: "lemon_squeezy",
           paymentIntentId: "",
+          expiresAt: checkoutExpiresAt,
           couponCode,
           couponReservationExpiresAt,
           couponReservationReleased: !couponReservationHeld,
         }],
         { session }
       );
+
+      if (resourceType === "course") {
+        await reserveCourseSeats({
+          courses,
+          userId: actor.id,
+          orderId: createdOrder._id,
+          expiresAt: checkoutExpiresAt,
+          session,
+        });
+      }
 
       await OrderItem.insertMany(
         resources.map((resource) => ({
@@ -1359,8 +1601,9 @@ const orderService = {
         courseIds,
         noteIds,
         resourceType,
-        redirectPath: resourceType === "note" ? "/student/vault" : "/student/dashboard",
+        redirectPath: resourceType === "note" ? "/student/vault" : "/payment/result",
         couponCode,
+        expiresAt: checkoutExpiresAt,
       });
     } catch (error) {
       await markOrderFailed(order._id);
@@ -1374,11 +1617,20 @@ const orderService = {
           {
             $set: {
               paymentIntentId: checkout.checkoutId || "",
+              checkoutUrl: checkout.checkoutUrl || "",
+              expiresAt: checkoutExpiresAt,
               paymentProvider: "lemon_squeezy",
             },
           },
           { session }
         );
+        if (checkout.checkoutId) {
+          await CourseSeatReservation.updateMany(
+            { orderId: order._id, status: "reserved" },
+            { $set: { checkoutId: checkout.checkoutId } },
+            { session }
+          );
+        }
       });
     } catch (error) {
       await markOrderFailed(order._id);
@@ -1390,11 +1642,23 @@ const orderService = {
       paymentProvider: "lemon_squeezy",
       paymentIntentId: checkout.checkoutId || "",
       checkoutUrl: checkout.checkoutUrl,
+      expiresAt: checkoutExpiresAt,
     };
   },
 
   async myOrders(userId) {
+    await expirePendingOrders();
     return Order.find({ userId }).sort({ createdAt: -1 });
+  },
+
+  async getMyOrder(userId, orderId) {
+    await expirePendingOrders();
+    if (!mongoose.isValidObjectId(orderId)) throw new ApiError(400, "Invalid order ID");
+    const order = await Order.findOne({ _id: orderId, userId }).lean();
+    if (!order) throw new ApiError(404, "Order not found");
+
+    const items = await OrderItem.find({ orderId: order._id }).lean();
+    return { ...order, items };
   },
 
   async listOrders(query) {
@@ -1421,8 +1685,8 @@ const orderService = {
     };
   },
 
-  async recordAdminRefund(id) {
-    return runDatabaseTransaction(async (session) => {
+  async recordAdminRefund(actor, id, request) {
+    const refundedOrder = await runDatabaseTransaction(async (session) => {
       const order = await Order.findById(id).session(session);
       if (!order) throw new ApiError(404, "Order not found");
       if (order.status === "refunded") return order;
@@ -1437,11 +1701,42 @@ const orderService = {
       await order.save({ session });
       return order;
     });
+    await recordAudit({
+      actor,
+      action: "order.refunded",
+      resourceType: "order",
+      resourceId: refundedOrder._id,
+      metadata: { amount: refundedOrder.amount, currency: refundedOrder.currency, userId: String(refundedOrder.userId) },
+      request,
+    });
+    return refundedOrder;
   },
 
   async listWebhookDeliveries(limit = 50) {
     const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
     return WebhookDelivery.find({}).sort({ createdAt: -1 }).limit(safeLimit).lean();
+  },
+
+  async replayWebhookDelivery(actor, deliveryId, request) {
+    if (!mongoose.isValidObjectId(deliveryId)) throw new ApiError(400, "Invalid webhook delivery ID");
+    const delivery = await WebhookDelivery.findById(deliveryId).lean();
+    if (!delivery) throw new ApiError(404, "Webhook delivery not found");
+    if (!delivery.payloadSnapshot) throw new ApiError(409, "This webhook has no replayable payload");
+
+    const rawBody = JSON.stringify(delivery.payloadSnapshot);
+    const signature = crypto.createHmac("sha256", config.lemonSqueezyWebhookSecret).update(rawBody).digest("hex");
+    const result = await this.handleLemonSqueezyWebhook({ rawBody, signature, body: delivery.payloadSnapshot });
+
+    await recordAudit({
+      actor,
+      action: "order.webhook_replayed",
+      resourceType: "webhook_delivery",
+      resourceId: delivery._id,
+      metadata: { deliveryKey: delivery.deliveryKey, localOrderId: delivery.localOrderId, eventName: delivery.eventName },
+      request,
+    });
+
+    return { ...result, replayed: true, deliveryId: String(delivery._id) };
   },
 
   async processLemonSqueezyWebhook({ rawBody, signature, body }) {
@@ -1482,12 +1777,31 @@ const orderService = {
       return { ok: true, skipped: true, eventName, orderId: String(order._id) };
     }
 
+    // Do not grant access from a delayed success webhook after the local checkout
+    // window has already expired. The provider checkout also has an expiry, but
+    // this protects the application if a stale or replayed event arrives later.
+    if (order.expiresAt && order.expiresAt <= new Date() && order.status !== "paid") {
+      return {
+        ok: true,
+        skipped: true,
+        eventName,
+        orderId: String(order._id),
+        status: order.status,
+        reason: "checkout_expired",
+      };
+    }
+
     const providerStatus = payload?.attributes?.status || "";
     if (providerStatus && providerStatus !== "paid") {
+      if (["failed", "cancelled", "canceled", "expired"].includes(String(providerStatus).toLowerCase())) {
+        await markOrderFailed(order._id);
+        return { ok: true, eventName, orderId: String(order._id), status: "failed", providerStatus };
+      }
       return { ok: true, skipped: true, eventName, orderId: String(order._id), status: providerStatus };
     }
 
     const { providerOrderId } = reconcileLemonSqueezyOrder(order, payload);
+    const paymentTime = getProviderPaymentTime(payload);
 
     await releaseExpiredCouponReservations();
 
@@ -1516,7 +1830,7 @@ const orderService = {
       currentOrder.couponReservationExpiresAt = null;
       await currentOrder.save({ session });
 
-      await ensureOrderEnrollments(currentOrder, session);
+      await ensureOrderEnrollments(currentOrder, session, paymentTime);
       await ensureOrderNotePurchases(currentOrder, session, providerOrderId);
 
       return {
@@ -1878,6 +2192,19 @@ const platformService = {
   },
 };
 
+const auditService = {
+  async list(query = {}) {
+    const filter = {};
+    if (query.action) filter.action = String(query.action).trim();
+    if (query.resourceType) filter.resourceType = String(query.resourceType).trim();
+    return paginate(AuditLog, filter, {
+      page: query.page,
+      limit: query.limit,
+      sort: { createdAt: -1 },
+    });
+  },
+};
+
 module.exports = {
   sanitizeUser,
   buildTokens,
@@ -1895,10 +2222,12 @@ module.exports = {
   couponService,
   notificationService,
   platformService,
+  auditService,
   upsertNotification,
   recalcCourseRatings,
   resolveCoursePrice,
   reconcileLemonSqueezyOrder,
   canDownloadNote,
   releaseExpiredCouponReservations,
+  expirePendingOrders,
 };

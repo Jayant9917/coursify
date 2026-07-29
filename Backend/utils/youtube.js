@@ -1,11 +1,13 @@
 const ApiError = require("./apiError");
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
+const playlistCache = new Map();
+const CACHE_TTL_MS = Math.max(30, Number(process.env.YOUTUBE_CACHE_TTL_SECONDS || 300)) * 1000;
 
 const getYouTubeApiKey = () => {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
-    throw new ApiError(503, "YouTube API is not configured");
+    throw new ApiError(503, "YouTube API is not configured", [], "YOUTUBE_NOT_CONFIGURED");
   }
   return apiKey;
 };
@@ -18,14 +20,31 @@ const fetchJson = async (url) => {
     const response = await fetch(url, { signal: controller.signal });
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new ApiError(502, payload?.error?.message || "YouTube request failed");
+      const reason = payload?.error?.errors?.[0]?.reason || "";
+      if (response.status === 403 && ["quotaExceeded", "dailyLimitExceeded", "userRateLimitExceeded", "rateLimitExceeded"].includes(reason)) {
+        throw new ApiError(429, "YouTube quota is temporarily exhausted. Please try again later.", [], "YOUTUBE_QUOTA_EXCEEDED");
+      }
+      if (response.status === 403 && ["forbidden", "playlistForbidden", "videoForbidden"].includes(reason)) {
+        throw new ApiError(404, "This YouTube resource is private or unavailable.", [], "YOUTUBE_RESOURCE_UNAVAILABLE");
+      }
+      if (response.status === 404) {
+        throw new ApiError(404, "YouTube resource was not found or is no longer public.", [], "YOUTUBE_NOT_FOUND");
+      }
+      if (response.status === 429) {
+        throw new ApiError(429, "YouTube is rate limiting requests. Please try again later.", [], "YOUTUBE_RATE_LIMITED");
+      }
+      if (response.status >= 500) {
+        throw new ApiError(503, "YouTube is temporarily unavailable. Please try again later.", [], "YOUTUBE_UNAVAILABLE");
+      }
+      throw new ApiError(502, payload?.error?.message || "YouTube request failed", [], "YOUTUBE_PROVIDER_ERROR");
     }
     return payload;
   } catch (error) {
     if (error.name === "AbortError") {
-      throw new ApiError(504, "YouTube request timed out");
+      throw new ApiError(504, "YouTube request timed out", [], "YOUTUBE_TIMEOUT");
     }
-    throw error;
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(503, "YouTube could not be reached. Please try again later.", [], "YOUTUBE_NETWORK_ERROR");
   } finally {
     clearTimeout(timeout);
   }
@@ -80,13 +99,16 @@ const fetchYouTubePlaylistDetails = async (playlistId) => {
     throw new ApiError(400, "Playlist ID is required");
   }
 
+  const cached = playlistCache.get(normalizedPlaylistId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
   const playlistInfoUrl =
     `${YOUTUBE_API_BASE}/playlists?part=snippet,contentDetails&id=${encodeURIComponent(normalizedPlaylistId)}&key=${encodeURIComponent(apiKey)}`;
   const playlistInfo = await fetchJson(playlistInfoUrl);
   const playlist = playlistInfo?.items?.[0];
 
   if (!playlist) {
-    throw new ApiError(404, "YouTube playlist not found or is not public");
+    throw new ApiError(404, "YouTube playlist not found or is not public", [], "YOUTUBE_NOT_FOUND");
   }
 
   const playlistSnippet = playlist.snippet || {};
@@ -144,7 +166,7 @@ const fetchYouTubePlaylistDetails = async (playlistId) => {
           `https://i.ytimg.com/vi/${encodeURIComponent(youtubeVideoId)}/hqdefault.jpg`,
         durationSeconds: resolved.durationSeconds || 0,
         position: Number(item?.snippet?.position || videos.length) + 1,
-        isAvailable: resolved.isAvailable !== false,
+        isAvailable: durationMap.has(youtubeVideoId) && resolved.isAvailable !== false,
       });
     }
 
@@ -153,7 +175,7 @@ const fetchYouTubePlaylistDetails = async (playlistId) => {
 
   const totalDuration = videos.reduce((sum, video) => sum + (Number(video.durationSeconds) || 0), 0);
 
-  return {
+  const result = {
     youtubePlaylistId: normalizedPlaylistId,
     title: playlistTitle,
     description: playlistDescription,
@@ -163,6 +185,8 @@ const fetchYouTubePlaylistDetails = async (playlistId) => {
     totalDuration,
     videos,
   };
+  playlistCache.set(normalizedPlaylistId, { value: result, expiresAt: Date.now() + CACHE_TTL_MS });
+  return result;
 };
 
 module.exports = {

@@ -60,6 +60,8 @@ export function CourseDetail() {
 
   const enrollments = enrollmentsQuery.data || [];
   const isEnrolled = isEnrollmentForCourse(enrollments, courseId);
+  const hasSeatLimit = course?.maxSeats !== null && course?.maxSeats !== undefined && Number.isFinite(Number(course.maxSeats));
+  const isSoldOut = hasSeatLimit && Number(course.maxSeats) <= Number(course.enrollmentCount || 0);
   const wishlistItems = wishlistQuery.data || [];
   const liked = isCourseInWishlist(wishlistItems, courseId);
   const lessonsBySection = useMemo(() => groupLessonsBySection(lessons), [lessons]);
@@ -123,9 +125,9 @@ export function CourseDetail() {
                 Go to Course
               </Button>
             ) : (
-              <Button onClick={goToCheckout}>
+              <Button onClick={goToCheckout} disabled={isSoldOut}>
                 <BookOpen className="h-4 w-4" />
-                Proceed to Checkout
+                {isSoldOut ? "Sold out" : "Proceed to Checkout"}
               </Button>
             )}
             <Button variant="outline" onClick={onWishlist} disabled={!isStudent}>
@@ -184,6 +186,7 @@ export function CourseDetail() {
                   <Fact label="Price" value={formatPrice(course.discountPrice || course.price)} />
                   <Fact label="Lessons" value={String(lessons.length)} />
                   <Fact label="Enrollment" value={String(course.enrollmentCount || 0)} />
+                  {hasSeatLimit ? <Fact label="Seats remaining" value={String(Math.max(0, Number(course.maxSeats) - Number(course.enrollmentCount || 0)))} /> : null}
                 </div>
               </Card>
             </div>

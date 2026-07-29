@@ -1,6 +1,6 @@
 const config = require("../config");
 const { log } = require("../utils/logger");
-const { releaseExpiredCouponReservations } = require("../services");
+const { expirePendingOrders, releaseExpiredCouponReservations } = require("../services");
 
 let timer = null;
 let running = false;
@@ -9,9 +9,12 @@ const runCouponCleanup = async () => {
   if (running) return;
   running = true;
   try {
-    const released = await releaseExpiredCouponReservations();
-    if (released > 0) {
-      log("info", "coupon.cleanup_completed", { released });
+    const [released, expired] = await Promise.all([
+      releaseExpiredCouponReservations(),
+      expirePendingOrders(),
+    ]);
+    if (released > 0 || expired > 0) {
+      log("info", "payment.cleanup_completed", { releasedCouponReservations: released, expiredOrders: expired });
     }
   } catch (error) {
     log("error", "coupon.cleanup_failed", {

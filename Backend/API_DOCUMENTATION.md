@@ -136,7 +136,8 @@ Business logic:
 - looks up the user by email
 - generates a one-time reset token
 - stores only the token hash in MongoDB with a TTL
-- in non-production, returns the raw reset token so the flow can be tested without email delivery
+- sends a branded password-reset email through Resend when `EMAIL_PROVIDER=resend`
+- in local `EMAIL_PROVIDER=console` mode, returns the raw reset token for development testing only
 
 Request body:
 
@@ -345,6 +346,16 @@ Query params:
 - `search`
 - `isFeatured`
 
+Capacity fields:
+
+- `maxSeats`: positive integer for a limited course; `null` means unlimited
+- `enrollmentCount`: confirmed active/completed enrollments
+- `reservedSeats`: internal temporary checkout reservations; not shown as a public seat count
+
+The public UI may show an advisory remaining-seat count, but checkout always
+performs the authoritative atomic capacity check and can return `409` if the
+course sold out while the page was open.
+
 Business logic:
 
 - filters only published courses
@@ -392,7 +403,8 @@ Request body:
   "categoryId": "665f...",
   "tags": ["react", "frontend"],
   "isPublished": false,
-  "isFeatured": true
+  "isFeatured": true,
+  "maxSeats": 100
 }
 ```
 
@@ -421,8 +433,8 @@ Role:
 
 Business logic:
 
-- removes the course
-- cascades related sections, lessons, enrollments, reviews, wishlist items, progress records, and order items
+- archives the course and unpublishes it instead of hard-deleting purchase history
+- blocks new reservations while preserving historic orders and enrollments
 
 ### PATCH `/api/courses/:id/publish`
 
@@ -630,12 +642,16 @@ Business logic:
 - validates the coupon if provided
 - applies the computed coupon discount if valid
 - reserves a coupon slot while the order is pending
+- atomically reserves one seat per limited course in the order
+- reuses an active matching checkout for refreshes or duplicate clicks
+- rejects an already-enrolled student and returns a conflict when the final seat is unavailable
 - creates order and order items
 - creates a Lemon Squeezy checkout session
-- stores the checkout reference on the order
+- stores the checkout reference and five-minute expiry on the order
 - leaves order in `pending` status until the Lemon Squeezy `order_created` webhook confirms a paid order
+- keeps the pending order visible in the student's order history so they can continue checkout before it expires
 - converts the pending coupon reservation into `redeemedCount` only after payment confirmation
-- releases the reservation when checkout creation fails or the pending reservation expires
+- marks an expired pending checkout as `failed` and releases its coupon and course-seat reservations
 - allows each authenticated student account to redeem a coupon code only once
 - wraps local order, order-item, and coupon reservation writes in a MongoDB transaction
 
@@ -664,7 +680,8 @@ Response:
   "status": "pending",
   "paymentProvider": "lemon_squeezy",
   "paymentIntentId": "checkout_123",
-  "checkoutUrl": "https://checkout.lemonsqueezy.com/..."
+  "checkoutUrl": "https://checkout.lemonsqueezy.com/...",
+  "expiresAt": "2026-07-29T12:05:00.000Z"
 }
 ```
 
@@ -678,13 +695,18 @@ Business logic:
 - finds the matching order from webhook custom data
 - accepts the `order_created` event only when the provider status is `paid`
 - reconciles the provider store, product or variant, currency, provider order ID, and paid amount before accepting payment
+- ignores a delayed or replayed paid event when the local five-minute checkout window has already expired
 - marks the order as `paid`
 - finalizes the coupon redemption reservation, if present
 - enrolls the student into all purchased courses
+- converts course-seat reservations into confirmed enrollments exactly once
+- honors a payment made before reservation expiry even if the webhook arrives later
+- rejects a payment that arrives after the seat was expired or reassigned for manual refund/reconciliation
 - is idempotent on repeated webhook deliveries and reconciles missing enrollments
 - commits order status, coupon redemption, and enrollment changes in one MongoDB transaction
 - completes `NotePurchase` records for paid Study Vault orders and preserves the provider order ID
 - revokes course enrollments and note access when an `order_refunded` event is received
+- reopens one confirmed seat per refunded course and makes the refund transition idempotent
 
 Webhook diagnostics are logged server-side without logging the signature or full
 payload. Each webhook log includes `eventName`, `orderId`, `providerStatus`, and
@@ -728,6 +750,17 @@ rate-limit, provider, and unknown server errors into readable API messages. Raw
 database errors, stack traces, provider payloads, and secrets are kept in server
 logs only.
 
+### GET `/api/orders/:id/status`
+
+Returns the authenticated student's own order status after returning from Lemon Squeezy.
+
+Role:
+
+- `student`
+
+The endpoint enforces order ownership and returns the order status, amount, timestamps,
+and order items. It is used by the payment result page while a webhook is pending.
+
 ### GET `/api/orders/webhook-monitoring`
 
 Returns recent Lemon Squeezy webhook delivery records for troubleshooting.
@@ -742,7 +775,19 @@ Optional query:
 
 Each record includes the event name, provider and local order IDs when available,
 delivery status, attempt count, response status, timestamps, and a safe error
-summary. Signature values and full provider payloads are never stored.
+summary. The provider payload snapshot is retained for admin-only replay;
+signatures are never stored.
+
+### POST `/api/orders/webhook-monitoring/:id/replay`
+
+Replays a stored Lemon Squeezy webhook through the normal signature verification,
+provider validation, transaction, and idempotent enrollment path.
+
+Role:
+
+- `admin`
+
+Replay is safe for already-paid orders because enrollment creation is idempotent.
 
 The backend also runs a maintenance worker after MongoDB connects. It checks for
 expired pending coupon reservations on a configurable interval and releases them
@@ -783,7 +828,12 @@ Returns the authenticated student’s completed note purchases.
 
 ### GET `/api/orders/me`
 
-Returns the authenticated student’s order history.
+Returns the authenticated student's order history.
+
+Pending orders include `checkoutUrl` and `expiresAt`. The frontend can show a
+Continue payment action while `expiresAt` is in the future. Once the five-minute
+window expires, the backend changes the order to `failed`; the student must create
+a new checkout instead of resuming the expired one.
 
 Role:
 
@@ -1071,6 +1121,7 @@ LEMONSQUEEZY_PRODUCT_ID=your_product_id
 LEMONSQUEEZY_VARIANT_ID=your_variant_id
 LEMONSQUEEZY_WEBHOOK_SECRET=your_webhook_secret
 LEMONSQUEEZY_AMOUNT_TOLERANCE_MINOR=100
+LEMONSQUEEZY_CHECKOUT_TTL_MINUTES=5
 ```
 
 ## Notes

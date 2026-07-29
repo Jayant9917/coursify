@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const compression = require("compression");
+const path = require("path");
 
 const config = require("./config");
 const { notFound, errorHandler } = require("./middlewares/error");
@@ -23,6 +24,7 @@ const uploadRoutes = require("./routes/uploads");
 const platformRoutes = require("./routes/platform");
 const playlistRoutes = require("./routes/playlists");
 const noteRoutes = require("./routes/notes");
+const auditRoutes = require("./routes/audit");
 
 const app = express();
 
@@ -54,7 +56,7 @@ app.use(
 app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: "Coursify API is running",
+    message: "Skillnest API is running",
   });
 });
 
@@ -64,6 +66,9 @@ app.get("/health/ready", (req, res) => {
   return res.status(ready ? 200 : 503).json({ success: ready, status: ready ? "ready" : "not_ready" });
 });
 app.get("/metrics", metricsHandler);
+// Local-development delivery only. Replace with protected provider playback before production.
+app.use("/uploads/videos", express.static(path.join(__dirname, "uploads", "videos")));
+app.use("/uploads/media", express.static(config.localMediaRoot));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -76,6 +81,7 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/platform", platformRoutes);
 app.use("/api/playlists", playlistRoutes);
 app.use("/api/notes", noteRoutes);
+app.use("/api/admin/audit-logs", auditRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

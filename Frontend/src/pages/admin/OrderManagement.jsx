@@ -1,4 +1,4 @@
-import { useAdminOrders, useAdminOrderDetails, useAdminRefundOrder } from "@/hooks/useOrders";
+import { useAdminOrders, useAdminOrderDetails, useAdminRefundOrder, useReplayWebhook, useWebhookMonitoring } from "@/hooks/useOrders";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Card, Badge, Button } from "@/components/ui";
@@ -15,6 +15,8 @@ export function OrderManagement() {
   const ordersQuery = useAdminOrders({ limit: 10, page });
   const detailsQuery = useAdminOrderDetails(selectedOrderId);
   const refundOrder = useAdminRefundOrder();
+  const webhookQuery = useWebhookMonitoring(20);
+  const replayWebhook = useReplayWebhook();
 
   if (ordersQuery.isLoading) return <LoadingSpinner />;
   if (ordersQuery.isError) return <ErrorState description="We could not load orders." onRetry={() => ordersQuery.refetch()} />;
@@ -26,6 +28,17 @@ export function OrderManagement() {
     try {
       await refundOrder.mutateAsync(order._id);
       toast.success("Refund recorded and course access revoked");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  };
+
+  const replay = async (delivery) => {
+    if (!window.confirm("Replay this webhook through the normal payment reconciliation flow?")) return;
+    try {
+      await replayWebhook.mutateAsync(delivery._id);
+      toast.success("Webhook replayed");
+      await Promise.all([ordersQuery.refetch(), webhookQuery.refetch()]);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
@@ -56,6 +69,32 @@ export function OrderManagement() {
           </div>
         </Card>
       ) : null}
+
+      <Card className="p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-bold">Webhook monitoring</h2>
+            <p className="text-sm text-slate-500">Review failed Lemon Squeezy deliveries and replay stored payloads.</p>
+          </div>
+          <Button variant="outline" onClick={() => webhookQuery.refetch()}>Refresh</Button>
+        </div>
+        {webhookQuery.isLoading ? <p className="mt-4 text-sm text-slate-500">Loading webhook deliveries...</p> : webhookQuery.isError ? <p className="mt-4 text-sm text-red-600">Could not load webhook deliveries.</p> : (
+          <div className="mt-4 space-y-3">
+            {(webhookQuery.data || []).length === 0 ? <p className="text-sm text-slate-500">No webhook deliveries recorded yet.</p> : (webhookQuery.data || []).slice(0, 5).map((delivery) => (
+              <div key={delivery._id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-950">{delivery.eventName || "Unknown event"} <span className="text-slate-400">· {delivery.localOrderId ? `Order ${delivery.localOrderId.slice(-6)}` : "No local order"}</span></p>
+                  <p className="mt-1 text-xs text-slate-500">Attempts: {delivery.attempts || 0} · {delivery.lastError || delivery.status}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={delivery.status === "processed" ? "success" : delivery.status === "failed" ? "danger" : "secondary"}>{delivery.status}</Badge>
+                  {delivery.status === "failed" ? <Button size="sm" variant="outline" onClick={() => replay(delivery)} disabled={replayWebhook.isPending}>Replay</Button> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {orders.length === 0 ? (
         <EmptyState title="No orders found" description="Order records will appear here." />

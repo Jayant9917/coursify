@@ -14,3 +14,6 @@ Frontend/test-results/
 Frontend/playwright-report/
 Frontend/coverage/
 Backend/coverage/
+
+# Uploaded media is runtime data, not source-controlled repository content.
+Backend/uploads/videos/

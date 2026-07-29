@@ -1,0 +1,12 @@
+NODE_ENV=production
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_replace_me
+
+FRONTEND_URL=https://skillnest.jayrana.in
+EMAIL_FROM_NO_REPLY=Skillnest <no-reply@skillnest.jayrana.in>
+EMAIL_FROM_SECURITY=Skillnest Security <security@skillnest.jayrana.in>
+EMAIL_FROM_NOTIFICATIONS=Skillnest <notifications@skillnest.jayrana.in>
+EMAIL_REPLY_TO=support@skillnest.jayrana.in
+EMAIL_LOGO_URL=https://skillnest.jayrana.in/logo.png
+
+# Never commit real values from this file.

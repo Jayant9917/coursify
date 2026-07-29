@@ -45,6 +45,7 @@ export function YouTubePlayer({
   onProgress,
   onEnded,
   onError,
+  className = "",
 }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
@@ -110,7 +111,15 @@ export function YouTubePlayer({
               }
             },
             onError: (event) => {
-              callbacksRef.current.onError?.(event);
+              const messages = {
+                2: "YouTube rejected the video request.",
+                5: "YouTube could not load this video in the player.",
+                100: "This video was removed or made private.",
+                101: "This video does not allow embedded playback.",
+                150: "This video does not allow embedded playback.",
+                153: "YouTube requires a valid player identity for this video.",
+              };
+              callbacksRef.current.onError?.({ code: event?.data, message: messages[event?.data] || "YouTube could not load this video." });
             },
           },
         });
@@ -118,11 +127,17 @@ export function YouTubePlayer({
       }
 
       if (currentVideoRef.current !== videoId) {
-        playerRef.current.cueVideoById({
+        const nextVideo = {
           videoId,
           startSeconds: Math.max(0, Number(startSeconds) || 0),
-        });
-        currentVideoRef.current = videoId;
+        };
+        if (typeof playerRef.current.cueVideoById === "function") {
+          playerRef.current.cueVideoById(nextVideo);
+          currentVideoRef.current = videoId;
+        } else if (typeof playerRef.current.loadVideoById === "function") {
+          playerRef.current.loadVideoById(nextVideo);
+          currentVideoRef.current = videoId;
+        }
       } else if (Number(startSeconds) > 0) {
         playerRef.current.seekTo(Number(startSeconds), true);
       }
@@ -141,10 +156,11 @@ export function YouTubePlayer({
   useEffect(
     () => () => {
       clearInterval(progressTimerRef.current);
+      playerRef.current?.destroy?.();
       playerRef.current = null;
     },
     []
   );
 
-  return <div ref={containerRef} className="aspect-video w-full overflow-hidden rounded-3xl bg-black" />;
+  return <div ref={containerRef} className={`aspect-video w-full overflow-hidden rounded-[var(--focus-radius-lg)] bg-black ${className}`} />;
 }

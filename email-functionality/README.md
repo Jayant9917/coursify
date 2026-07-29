@@ -1,12 +1,12 @@
 # Future Email Functionality
 
-This folder records the planned email architecture for Skillnest. The application does not integrate React Email or Resend yet because the project does not currently own or control a sending domain.
+This folder records the email architecture for Skillnest. The backend now has a Resend delivery adapter and React Email password-reset template. Domain verification and Cloudflare routing remain deployment-level configuration.
 
 ## Current Decision
 
-Do not add email-provider code, API keys, or DNS-dependent configuration yet.
+Keep provider keys server-side and configure them through deployment secrets. DNS-dependent settings must be completed in Resend and Cloudflare.
 
-When a domain is available, the application can send branded emails from `support@skillnest.com` and forward incoming support messages to `ranajayant677@gmail.com`.
+The application sends branded emails through Resend and forwards incoming `support@skillnest.jayrana.in` messages through Cloudflare Email Routing to `ranajayant527@gmail.com`.
 
 ## Planned Services
 
@@ -18,27 +18,27 @@ React Email creates the email markup. It does not send email by itself.
 
 ### Resend
 
-Resend will provide outbound email delivery, delivery and bounce events, webhook processing, and inbound email receiving if Resend Receiving is selected.
+Resend provides outbound email delivery. The current backend uses it for password-reset messages and is structured for future course, payment, and security notifications.
 
 ## Intended Address Flow
 
 ### Outbound mail
 
 ```text
-Skillnest backend -> React Email template -> Resend API -> support@skillnest.com
+Skillnest backend -> React Email template -> Resend API -> user inbox
 ```
 
 The visible sender will be something such as:
 
 ```text
-Skillnest Support <support@skillnest.com>
+Skillnest Security <security@skillnest.jayrana.in>
 ```
 
 ### Inbound support mail
 
 ```text
-User -> support@skillnest.com -> Resend Receiving or existing mail provider
-     -> Backend inbound webhook -> ranajayant677@gmail.com
+User -> support@skillnest.jayrana.in -> Cloudflare Email Routing
+     -> ranajayant527@gmail.com
 ```
 
 The Gmail address is the forwarding destination. It is not the sender identity that Resend verifies.
@@ -47,36 +47,25 @@ The Gmail address is the forwarding destination. It is not the sender identity t
 
 Before implementation:
 
-1. Purchase or otherwise obtain control of `skillnest.com`.
+1. Confirm control of `jayrana.in` and use `skillnest.jayrana.in`.
 2. Create a Resend account and add the domain.
 3. Add the SPF and DKIM records provided by Resend.
 4. Add a DMARC policy after SPF and DKIM are working.
-5. Decide who currently handles incoming mail for `skillnest.com`.
+5. Decide who currently handles incoming mail for `skillnest.jayrana.in`.
 6. Configure inbound mail without unintentionally replacing an existing Gmail or mailbox provider.
 
-If the root domain already has MX records, prefer a dedicated inbound subdomain such as `inbox.skillnest.com`, or use the existing provider's forwarding feature. Replacing MX records can stop existing mailboxes from receiving mail.
+If the root domain already has MX records, use the dedicated `skillnest.jayrana.in` subdomain. Replacing MX records can stop existing mailboxes from receiving mail.
 
 ## Backend Implementation Plan
 
 ### 1. Email module
 
-Create a backend email module responsible for creating the Resend client, rendering React Email templates, sending messages, normalizing provider errors, and logging message IDs without logging private message content.
-
-Suggested structure:
+Implemented in `Backend/utils/email.js` and `Backend/utils/emailTemplates.js`. The module creates the Resend client, renders React Email templates, sends messages, and avoids logging private message content.
 
 ```text
 Backend/
-  emails/
-    templates/
-      WelcomeEmail.jsx
-      PasswordResetEmail.jsx
-      PurchaseConfirmationEmail.jsx
-      SupportNotificationEmail.jsx
-    emailService.js
-  controllers/
-    emailController.js
-  routes/
-    emailRoutes.js
+  utils/email.js
+  utils/emailTemplates.js
 ```
 
 The exact location should follow the existing backend service and route conventions when implementation begins.
@@ -86,12 +75,14 @@ The exact location should follow the existing backend service and route conventi
 Add these only to local and deployment environment configuration, never to Git:
 
 ```env
+EMAIL_PROVIDER=resend
 RESEND_API_KEY=re_...
-EMAIL_FROM="Skillnest Support <support@skillnest.com>"
-SUPPORT_EMAIL=support@skillnest.com
-SUPPORT_FORWARD_TO=ranajayant677@gmail.com
-RESEND_WEBHOOK_SECRET=whsec_...
-APP_URL=https://skillnest.com
+EMAIL_FROM_NO_REPLY="Skillnest <no-reply@skillnest.jayrana.in>"
+EMAIL_FROM_SECURITY="Skillnest Security <security@skillnest.jayrana.in>"
+EMAIL_FROM_NOTIFICATIONS="Skillnest <notifications@skillnest.jayrana.in>"
+EMAIL_REPLY_TO=support@skillnest.jayrana.in
+EMAIL_LOGO_URL=https://skillnest.jayrana.in/logo.png
+FRONTEND_URL=https://skillnest.jayrana.in
 ```
 
 The real API key must remain server-side and must not be placed in the frontend or committed to `.env.example`.
@@ -108,7 +99,7 @@ The endpoint must:
 - Retrieve full message content using the received email ID.
 - Sanitize HTML before displaying or forwarding it.
 - Enforce attachment size and type limits.
-- Forward the message to `ranajayant677@gmail.com`.
+- Forward the message to `ranajayant527@gmail.com`.
 - Return quickly and move heavier processing to the background queue.
 - Store a provider event ID for idempotency.
 
@@ -128,11 +119,14 @@ Add event handling for `email.sent`, `email.delivered`, `email.bounced`, and `em
 - Use a background job for forwarding and retries.
 - Make webhook handling idempotent.
 
-## Frontend Features to Add Later
+## Current frontend behavior
 
 - Contact/support form.
 - Success and failure states.
-- Password-reset email flow.
+- Password-reset form calls the backend. In Resend mode, the token is never returned to the browser.
+- In local `EMAIL_PROVIDER=console` mode, the development token remains available for testing.
+
+## Frontend Features to Add Later
 - Email verification screen and resend action.
 - Purchase confirmation messaging.
 - Admin email delivery status, if needed.
@@ -160,7 +154,7 @@ The frontend should call the backend API. It must never call Resend directly.
 
 - Send to Gmail, Outlook, and another provider.
 - Check SPF, DKIM, and DMARC alignment.
-- Verify replies to `support@skillnest.com` arrive at the intended mailbox.
+- Verify replies to `support@skillnest.jayrana.in` arrive at the intended mailbox.
 - Test attachments and malicious HTML safely.
 - Confirm bounce and complaint events are handled.
 
@@ -168,18 +162,18 @@ The frontend should call the backend API. It must never call Resend directly.
 
 1. Own and verify the domain.
 2. Configure Resend outbound sending.
-3. Add React Email templates.
-4. Send welcome and password-reset emails.
+3. Configure Cloudflare Email Routing for `support@skillnest.jayrana.in`.
+4. Send password-reset emails through the implemented adapter.
 5. Add delivery and bounce webhooks.
-6. Decide whether Resend Receiving or the existing mail provider should handle inbound support mail.
-7. Add the inbound forwarding webhook.
+6. Add email verification and resend action.
+7. Add purchase, refund, and security notification templates.
 8. Add retry, idempotency, monitoring, and tests.
 9. Verify the complete flow in staging before production.
 
 ## What Is Blocked Until Then
 
-- Sending from `support@skillnest.com` cannot be production-verified.
-- Receiving mail at `support@skillnest.com` cannot be configured safely without DNS control.
+- Sending from `support@skillnest.jayrana.in` cannot be production-verified until `jayrana.in` is active in Cloudflare.
+- Receiving mail at `support@skillnest.jayrana.in` cannot be configured safely without DNS control.
 - SPF, DKIM, DMARC, and MX records cannot be added by application code.
 - The real Resend API key must be supplied through deployment secrets.
 

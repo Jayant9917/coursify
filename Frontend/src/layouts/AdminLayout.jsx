@@ -1,7 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/common/Sidebar";
-import { Announcement } from "@/components/layout/Announcement";
 import { BadgeDollarSign, BookOpen, LayoutDashboard, ReceiptText, Shapes, Users } from "lucide-react";
 
 const items = [
@@ -16,7 +15,6 @@ const items = [
 export function AdminLayout() {
   return (
     <div className="min-h-screen">
-      <Announcement />
       <Navbar />
       <div className="page-shell py-6 lg:flex lg:gap-6">
         <Sidebar title="Admin" items={items} />

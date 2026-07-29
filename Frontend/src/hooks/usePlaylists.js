@@ -50,6 +50,18 @@ export function useRefreshPlaylist() {
   });
 }
 
+export function useDeletePlaylist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => playlistApi.remove(id),
+    onSuccess: (_, id) => {
+      queryClient.removeQueries({ queryKey: ["playlists", "detail", id] });
+      queryClient.removeQueries({ queryKey: ["playlists", "watch", id] });
+      queryClient.invalidateQueries({ queryKey: ["playlists", "me"] });
+    },
+  });
+}
+
 export function useUpdatePlaylistProgress() {
   const queryClient = useQueryClient();
   return useMutation({

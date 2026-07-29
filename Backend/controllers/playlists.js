@@ -16,6 +16,10 @@ const playlistController = {
     const data = await playlistService.getById(req.user, req.params.id);
     send(res, data);
   }),
+  remove: asyncHandler(async (req, res) => {
+    const data = await playlistService.remove(req.user, req.params.id);
+    send(res, data);
+  }),
   watch: asyncHandler(async (req, res) => {
     const data = await playlistService.watch(req.user, req.params.id);
     send(res, data);

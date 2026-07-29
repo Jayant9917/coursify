@@ -136,6 +136,7 @@ const errorHandler = (error, req, res, next) => {
   res.status(statusCode).json({
     success: false,
     message: clientMessage,
+    ...(error?.code ? { code: error.code } : {}),
     ...(safeErrors.length ? { errors: safeErrors } : {}),
   });
 };

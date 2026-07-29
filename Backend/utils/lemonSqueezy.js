@@ -38,6 +38,7 @@ const createCheckout = async ({
   resourceType = "course",
   couponCode = "",
   redirectPath = "/student/dashboard",
+  expiresAt = null,
 }) => {
   const { apiKey, storeId, variantId, frontendUrl } = getLemonSqueezyConfig();
   const customPrice = normalizeMoneyAmount(amount);
@@ -64,6 +65,7 @@ const createCheckout = async ({
             ...(couponCode ? { coupon_code: String(couponCode) } : {}),
           },
         },
+        ...(expiresAt ? { expires_at: new Date(expiresAt).toISOString() } : {}),
         ...(Object.keys(productOptions).length ? { product_options: productOptions } : {}),
       },
       relationships: {

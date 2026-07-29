@@ -27,6 +27,26 @@ export function useOrders({ pollOrderId = "", pollDurationMs = 120000 } = {}) {
   });
 }
 
+export function useOrderStatus(orderId, pollDurationMs = 120000) {
+  const pollStartedAtRef = useRef(Date.now());
+
+  useEffect(() => {
+    pollStartedAtRef.current = Date.now();
+  }, [orderId]);
+
+  return useQuery({
+    queryKey: ["order-status", orderId],
+    queryFn: () => orderApi.status(orderId),
+    enabled: Boolean(orderId),
+    refetchInterval: (query) => {
+      if (Date.now() - pollStartedAtRef.current >= pollDurationMs) return false;
+      if (["paid", "failed", "refunded"].includes(query.state.data?.status)) return false;
+      return 3000;
+    },
+    refetchIntervalInBackground: Boolean(orderId),
+  });
+}
+
 export function useAdminOrders(params = {}) {
   return useQuery({
     queryKey: ["admin-orders", params],
@@ -51,6 +71,21 @@ export function useAdminRefundOrder() {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
       queryClient.invalidateQueries({ queryKey: ["orders"] });
     },
+  });
+}
+
+export function useWebhookMonitoring(limit = 50) {
+  return useQuery({
+    queryKey: ["webhook-monitoring", limit],
+    queryFn: () => orderApi.webhookMonitoring(limit),
+  });
+}
+
+export function useReplayWebhook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => orderApi.replayWebhook(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["webhook-monitoring"] }),
   });
 }
 

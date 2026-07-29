@@ -1,22 +1,19 @@
 import { Outlet } from "react-router-dom";
 import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/common/Sidebar";
-import { Announcement } from "@/components/layout/Announcement";
-import { BookOpen, FileText, LayoutDashboard, Heart, ShoppingBag, UserCircle2 } from "lucide-react";
+import { BookOpen, LayoutDashboard, Heart, ShoppingBag, UserCircle2 } from "lucide-react";
 
 const items = [
   { to: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/student/courses", label: "My Courses", icon: BookOpen },
   { to: "/student/orders", label: "Orders", icon: ShoppingBag },
   { to: "/student/wishlist", label: "Wishlist", icon: Heart },
-  { to: "/student/vault", label: "Study Vault", icon: FileText },
   { to: "/student/profile", label: "Profile", icon: UserCircle2 },
 ];
 
 export function StudentLayout() {
   return (
     <div className="min-h-screen">
-      <Announcement />
       <Navbar />
       <div className="page-shell py-6 lg:flex lg:gap-6">
         <Sidebar title="Student" items={items} />

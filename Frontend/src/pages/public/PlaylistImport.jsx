@@ -31,14 +31,14 @@ export function PlaylistImport() {
   });
 
   return (
-    <div className="page-shell py-10">
-      <Card className="mx-auto max-w-3xl overflow-hidden border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+    <div className="focus-room-library page-shell min-h-screen py-10">
+      <Card className="focus-room-surface mx-auto max-w-3xl overflow-hidden rounded-[var(--focus-radius-xl)] border">
         <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-900 p-8 text-white sm:p-12">
-            <p className="eyebrow text-white/70">Import playlist</p>
+          <div className="bg-[linear-gradient(145deg,#171717_0%,#115e59_58%,#365314_100%)] p-8 text-white sm:p-12">
+            <p className="eyebrow text-white/70">Focus Room import</p>
             <h1 className="mt-4 text-4xl font-bold tracking-tight">Bring a public YouTube playlist into Focus Room.</h1>
             <p className="mt-5 text-base leading-7 text-white/80">
-              Paste a playlist URL and we will store the playlist metadata, the ordered video list, and progress tracking inside Coursify.
+              Paste a playlist URL and we will store the playlist metadata, the ordered video list, and progress tracking inside Skillnest.
             </p>
             <div className="mt-8 flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
               <PlayCircle className="h-5 w-5" />
@@ -52,31 +52,33 @@ export function PlaylistImport() {
           <div className="p-8 sm:p-12">
             <div className="space-y-6">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">YouTube playlist</p>
-                <h2 className="mt-2 text-3xl font-black text-slate-950 dark:text-white">Paste the playlist link.</h2>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--focus-text-muted)]">YouTube playlist</p>
+                <h2 className="mt-2 text-3xl font-black text-[var(--focus-text)]">Paste the playlist link.</h2>
               </div>
 
               <form className="space-y-4" onSubmit={submit}>
                 <div className="space-y-2">
                   <Label>Playlist URL</Label>
                   <div className="relative">
-                    <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--focus-text-muted)]" />
                     <Input
-                      className="pl-9"
+                      id="playlist-url"
+                      className="border-[var(--focus-border-strong)] bg-[var(--focus-elevated)] pl-9 text-white placeholder:text-[var(--focus-text-muted)]"
                       placeholder="https://www.youtube.com/playlist?list=PL..."
                       {...form.register("url")}
                     />
                   </div>
-                  {form.formState.errors.url ? <p className="text-sm text-red-600">{form.formState.errors.url.message}</p> : null}
+                  {form.formState.errors.url ? <p className="text-sm text-red-300">{form.formState.errors.url.message}</p> : null}
+                  <p className="text-xs text-[var(--focus-text-muted)]">Example: https://www.youtube.com/playlist?list=PL...</p>
                 </div>
 
-                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting || importPlaylist.isPending}>
-                  Import playlist
+                <Button type="submit" className="focus-room-primary w-full" disabled={form.formState.isSubmitting || importPlaylist.isPending}>
+                  {importPlaylist.isPending ? "Importing..." : "Import playlist"}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </form>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
+              <div className="rounded-[var(--focus-radius-md)] border border-[var(--focus-border)] bg-[var(--focus-elevated)] p-4 text-sm text-[var(--focus-text-secondary)]">
                 We validate the URL on the frontend and again on the backend before fetching YouTube metadata.
               </div>
             </div>

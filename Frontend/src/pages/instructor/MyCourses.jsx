@@ -32,18 +32,21 @@ export function MyCourses() {
       ) : (
         <div className="grid gap-4">
           {courses.map((course) => (
-            <Card key={course._id} className="p-5">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-950">{course.title}</h3>
-                  <p className="mt-1 text-sm text-slate-500">{course.shortDescription || course.description}</p>
+            <Card key={course._id} className="p-5 transition-shadow hover:shadow-md">
+              <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <div className="min-w-0">
+                  <h3 className="truncate text-lg font-semibold text-slate-950">{course.title}</h3>
+                  <p className="mt-1 line-clamp-2 max-w-2xl text-sm leading-6 text-slate-500">{course.shortDescription || course.description}</p>
                   <p className="mt-2 text-sm text-slate-500">Updated {formatDate(course.updatedAt)}</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-end">
                   <Badge variant={course.isPublished ? "success" : "secondary"}>{course.isPublished ? "Published" : "Draft"}</Badge>
                   <Badge variant="outline">{course.level}</Badge>
-                  <span className="text-sm text-slate-500">{formatPrice(course.discountPrice || course.price)}</span>
-                  <Button asChild variant="outline">
+                  <span className="whitespace-nowrap px-1 text-sm font-medium text-slate-600">{formatPrice(course.discountPrice || course.price)}</span>
+                  <Button asChild variant="outline" className="shrink-0 whitespace-nowrap">
+                    <Link to={`/instructor/courses/${course._id}/preview`}>Preview</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="shrink-0 whitespace-nowrap">
                     <Link to={`/instructor/courses/${course._id}/edit`}>Edit</Link>
                   </Button>
                 </div>

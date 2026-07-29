@@ -271,6 +271,10 @@ export const courseApi = {
     const response = await api.get("/courses/instructor/me", { params: query });
     return unwrap(response);
   },
+  async instructorDetails(id) {
+    const response = await api.get(`/courses/instructor/${id}`);
+    return unwrap(response);
+  },
   async createSection(courseId, payload) {
     const response = await api.post(`/courses/${courseId}/sections`, payload);
     return unwrap(response);
@@ -370,6 +374,10 @@ export const orderApi = {
   async myOrders() {
     return orderApi.getMyOrders();
   },
+  async status(id) {
+    const response = await api.get(`/orders/${id}/status`);
+    return unwrap(response);
+  },
   async list(query = {}) {
     const response = await api.get("/orders", { params: query });
     return unwrap(response);
@@ -384,6 +392,10 @@ export const orderApi = {
   },
   async webhookMonitoring(limit = 50) {
     const response = await api.get("/orders/webhook-monitoring", { params: { limit } });
+    return unwrap(response);
+  },
+  async replayWebhook(id) {
+    const response = await api.post(`/orders/webhook-monitoring/${id}/replay`);
     return unwrap(response);
   },
 };
@@ -527,6 +539,10 @@ export const playlistApi = {
     const response = await api.get(`/playlists/${id}`);
     return unwrap(response);
   },
+  async remove(id) {
+    const response = await api.delete(`/playlists/${id}`);
+    return unwrap(response);
+  },
   async watch(id) {
     const response = await api.get(`/playlists/${id}/watch`);
     return unwrap(response);
@@ -542,6 +558,10 @@ export const playlistApi = {
 };
 
 export const uploadApi = {
+  async getConfig() {
+    const response = await api.get("/uploads/config");
+    return unwrap(response);
+  },
   async uploadImage({ dataUrl, folder = "avatars", publicId }) {
     const response = await api.post("/uploads/image", { dataUrl, folder, publicId });
     return unwrap(response);
@@ -568,5 +588,143 @@ export const uploadApi = {
     }
 
     return true;
+  },
+  async uploadLocalFile(file, folder) {
+    const formData = new FormData();
+    formData.append("folder", folder);
+    formData.append("file", file);
+    const response = await api.post("/uploads/local-file", formData);
+    return unwrap(response);
+  },
+  async uploadS3Multipart(file, folder, onProgress) {
+    const fingerprint = `skillnest-s3-multipart:${folder}:${file.name}:${file.size}:${file.lastModified}`;
+    const savedSession = localStorage.getItem(fingerprint);
+    let session = null;
+    if (savedSession) {
+      try {
+        session = JSON.parse(savedSession);
+      } catch {
+        localStorage.removeItem(fingerprint);
+      }
+    }
+    if (session?.uploadId) {
+      try {
+        const status = await this.getS3MultipartStatus(session.uploadId);
+        session = { ...session, ...status, parts: status.parts || session.parts || [] };
+      } catch {
+        localStorage.removeItem(fingerprint);
+        session = null;
+      }
+    }
+    if (!session) {
+      session = await unwrap(await api.post("/uploads/s3-multipart/initiate", {
+        fileName: file.name,
+        contentType: file.type,
+        folder,
+      }));
+      session.parts = [];
+      localStorage.setItem(fingerprint, JSON.stringify(session));
+    }
+    const partSize = Number(session.partSize || 8 * 1024 * 1024);
+    const partsByNumber = new Map((session.parts || []).map((part) => [Number(part.partNumber), part]));
+    const totalParts = Math.ceil(file.size / partSize);
+      for (let index = 0; index < totalParts; index += 1) {
+        const partNumber = index + 1;
+        const existingPart = partsByNumber.get(partNumber);
+        if (existingPart?.etag) {
+          onProgress?.({ uploadedBytes: Math.min((index + 1) * partSize, file.size), totalBytes: file.size, percent: Math.round(((index + 1) / totalParts) * 100) });
+          continue;
+        }
+        const chunk = file.slice(index * partSize, Math.min((index + 1) * partSize, file.size));
+        const partUrl = await unwrap(await api.post(`/uploads/s3-multipart/${session.uploadId}/part-url`, { partNumber }));
+        const response = await fetch(partUrl.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: chunk,
+        });
+        if (!response.ok) throw new Error(`S3 part ${partNumber} upload failed`);
+        const etag = response.headers.get("ETag") || response.headers.get("etag");
+        if (!etag) throw new Error("S3 did not return an ETag for the uploaded part");
+        partsByNumber.set(partNumber, { partNumber, etag });
+        session.parts = Array.from(partsByNumber.values()).sort((left, right) => left.partNumber - right.partNumber);
+        localStorage.setItem(fingerprint, JSON.stringify(session));
+        onProgress?.({ uploadedBytes: Math.min((index + 1) * partSize, file.size), totalBytes: file.size, percent: Math.round(((index + 1) / totalParts) * 100) });
+      }
+    const result = await unwrap(await api.post(`/uploads/s3-multipart/${session.uploadId}/complete`, { parts: session.parts }));
+    localStorage.removeItem(fingerprint);
+    return result;
+  },
+  async getS3MultipartStatus(uploadId) {
+    const response = await api.get(`/uploads/s3-multipart/${uploadId}`);
+    return unwrap(response);
+  },
+  async abortS3Multipart(uploadId) {
+    const response = await api.delete(`/uploads/s3-multipart/${uploadId}`);
+    return unwrap(response);
+  },
+  async startLocalVideoUpload({ fileName, contentType, size }) {
+    const response = await api.post("/uploads/local-video", { fileName, contentType, size });
+    return unwrap(response);
+  },
+  async getLocalVideoUploadStatus(uploadId) {
+    const response = await api.get(`/uploads/local-video/${uploadId}`);
+    return unwrap(response);
+  },
+  async uploadLocalVideoResumable(file, onProgress) {
+    const chunkSize = 5 * 1024 * 1024;
+    const fingerprint = `coursify-local-video:${file.name}:${file.size}:${file.lastModified}`;
+    const savedUploadId = localStorage.getItem(fingerprint);
+    let upload = null;
+
+    if (savedUploadId) {
+      try {
+        upload = await this.getLocalVideoUploadStatus(savedUploadId);
+      } catch {
+        localStorage.removeItem(fingerprint);
+      }
+    }
+    if (!upload) {
+      upload = await this.startLocalVideoUpload({ fileName: file.name, contentType: file.type, size: file.size });
+      localStorage.setItem(fingerprint, upload.uploadId);
+    }
+
+    let offset = Number(upload.uploadedBytes || 0);
+    onProgress?.({ uploadedBytes: offset, totalBytes: file.size, percent: Math.round((offset / file.size) * 100) });
+    while (offset < file.size) {
+      const chunk = file.slice(offset, Math.min(offset + chunkSize, file.size));
+      let next;
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          const formData = new FormData();
+          formData.append("chunk", new Blob([chunk], { type: file.type || "application/octet-stream" }), "chunk");
+          const response = await api.patch(`/uploads/local-video/${upload.uploadId}/chunk`, formData, {
+            headers: { "Upload-Offset": String(offset) },
+          });
+          next = unwrap(response);
+          break;
+        } catch (error) {
+          if (error?.response?.status === 409) {
+            const latest = await this.getLocalVideoUploadStatus(upload.uploadId);
+            const latestOffset = Number(latest.uploadedBytes || 0);
+            if (latestOffset > offset) {
+              offset = latestOffset;
+              onProgress?.({ uploadedBytes: offset, totalBytes: file.size, percent: Math.round((offset / file.size) * 100) });
+              next = latest;
+              break;
+            }
+          }
+          if (attempt === 3) throw error;
+        }
+      }
+      offset = Number(next.uploadedBytes || offset + chunk.size);
+      onProgress?.({ uploadedBytes: offset, totalBytes: file.size, percent: Math.round((offset / file.size) * 100) });
+    }
+
+    const response = await api.post(`/uploads/local-video/${upload.uploadId}/complete`);
+    localStorage.removeItem(fingerprint);
+    const result = unwrap(response);
+    return result.fileUrl?.startsWith("/")
+      ? { ...result, fileUrl: new URL(result.fileUrl, api.defaults.baseURL.replace(/\/api\/?$/, "/")).toString() }
+      : result;
   },
 };

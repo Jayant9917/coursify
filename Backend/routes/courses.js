@@ -18,6 +18,7 @@ router.get("/", courseController.listPublic);
 router.post("/", requireAuth, requireRole("instructor", "admin"), validate(courseSchema), courseController.create);
 router.get("/admin/all", requireAuth, requireRole("admin"), courseController.adminList);
 router.get("/instructor/me", requireAuth, requireRole("instructor", "admin"), courseController.instructorCourses);
+router.get("/instructor/:id", requireAuth, requireRole("instructor", "admin"), courseController.instructorDetails);
 
 router.post("/:id/sections", requireAuth, requireRole("instructor", "admin"), validate(sectionSchema), sectionController.create);
 router.put("/sections/:id", requireAuth, requireRole("instructor", "admin"), validate(sectionSchema), sectionController.update);

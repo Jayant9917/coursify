@@ -13,7 +13,7 @@ const schema = z.object({
 
 export function ForgotPassword() {
   const navigate = useNavigate();
-  const [resetToken, setResetToken] = useState("");
+  const [developmentResetToken, setDevelopmentResetToken] = useState("");
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: { email: "" },
@@ -22,9 +22,9 @@ export function ForgotPassword() {
   const submit = form.handleSubmit(async (values) => {
     try {
       const data = await authApi.forgotPassword(values);
-      if (data?.resetToken) {
-        setResetToken(data.resetToken);
-        toast.success("Reset token generated");
+      if (data?.resetUrl) {
+        setDevelopmentResetToken(data.resetToken || "");
+        toast.success(data.resetToken ? "Development reset link generated" : "Reset link sent");
         navigate(`/reset-password?token=${data.resetToken}`);
         return;
       }
@@ -53,10 +53,10 @@ export function ForgotPassword() {
           </Button>
         </form>
 
-        {resetToken ? (
+        {developmentResetToken ? (
           <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">Development reset token</p>
-            <p className="mt-1 break-all">{resetToken}</p>
+            <p className="mt-1 break-all">{developmentResetToken}</p>
           </div>
         ) : null}
       </Card>

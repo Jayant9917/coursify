@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate, useParams } from "react-router-dom";
@@ -11,7 +12,7 @@ import { Button, Card, Input, Label, Select, Textarea, Badge } from "@/component
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorState } from "@/components/common/ErrorState";
 import { EmptyState } from "@/components/common/EmptyState";
-import { Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, CircleAlert, Plus, Trash2 } from "lucide-react";
 import { uploadApi } from "@/services/api";
 import { fileToDataUrl } from "@/utils/fileToDataUrl";
 
@@ -22,6 +23,7 @@ const lessonSchema = z.object({
   content: z.string().optional(),
   videoUrl: z.string().optional(),
   fileUrl: z.string().optional(),
+  fileKey: z.string().optional(),
   duration: z.coerce.number().optional(),
   isPreview: z.boolean().optional(),
   order: z.coerce.number().optional(),
@@ -48,13 +50,17 @@ const schema = z.object({
   tagsText: z.string().optional(),
   isPublished: z.boolean().optional(),
   isFeatured: z.boolean().optional(),
+  maxSeats: z.preprocess((value) => (value === "" || value === undefined || value === null ? null : value), z.coerce.number().int().min(1).nullable()),
   sections: z.array(sectionSchema).default([]),
 });
 
 export function CourseEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isEdit = Boolean(id);
+  const draftKey = `skillnest-course-draft:${id || "new"}`;
+  const savedDraft = readCourseDraft(draftKey);
   const coursesQuery = useInstructorCourses({ limit: 100 });
   const categoriesQuery = useCategories();
   const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
@@ -74,12 +80,23 @@ export function CourseEditor() {
       tagsText: "",
       isPublished: false,
       isFeatured: false,
+      maxSeats: null,
       sections: [],
+      ...(savedDraft || {}),
     },
   });
 
   const sectionsArray = useFieldArray({ control: editorForm.control, name: "sections" });
   const currentSections = useWatch({ control: editorForm.control, name: "sections" });
+  const watchedForm = useWatch({ control: editorForm.control });
+
+  useEffect(() => {
+    if (!editorForm.formState.isDirty) return undefined;
+    const timer = window.setTimeout(() => {
+      window.localStorage.setItem(draftKey, JSON.stringify(watchedForm));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [draftKey, editorForm.formState.isDirty, watchedForm]);
 
   const courseMatch = useMemo(
     () => (coursesQuery.data?.data || coursesQuery.data || []).find((course) => course._id === id),
@@ -102,15 +119,17 @@ export function CourseEditor() {
         tagsText: "",
         isPublished: false,
         isFeatured: false,
+        maxSeats: null,
         sections: [],
+        ...(readCourseDraft(draftKey) || {}),
       });
       return;
     }
 
     if (courseMatch) {
-      loadCourse(courseMatch.slug, editorForm);
+      loadCourse(courseMatch._id, editorForm, draftKey);
     }
-  }, [isEdit, courseMatch, editorForm]);
+  }, [isEdit, courseMatch, editorForm, draftKey]);
 
   if (coursesQuery.isLoading || categoriesQuery.isLoading) return <LoadingSpinner />;
   if (coursesQuery.isError || categoriesQuery.isError) return <ErrorState description="We could not load instructor courses." onRetry={() => coursesQuery.refetch()} />;
@@ -164,6 +183,7 @@ export function CourseEditor() {
         tags,
         isPublished: Boolean(values.isPublished),
         isFeatured: Boolean(values.isFeatured),
+        maxSeats: values.maxSeats === null ? null : Number(values.maxSeats),
       };
 
       const savedCourse = isEdit ? await courseApi.update(id, payload) : await courseApi.create(payload);
@@ -181,12 +201,13 @@ export function CourseEditor() {
 
         for (let lessonIndex = 0; lessonIndex < (section.lessons || []).length; lessonIndex += 1) {
           const lesson = section.lessons[lessonIndex];
-          const lessonPayload = {
+            const lessonPayload = {
             title: lesson.title,
             type: lesson.type,
             content: lesson.content || "",
-            videoUrl: lesson.videoUrl || "",
-            fileUrl: lesson.fileUrl || "",
+              videoUrl: lesson.videoUrl || "",
+              fileUrl: lesson.fileUrl || "",
+              fileKey: lesson.fileKey || "",
             duration: Number(lesson.duration || 0),
             isPreview: Boolean(lesson.isPreview),
             order: lesson.order || lessonIndex + 1,
@@ -199,6 +220,9 @@ export function CourseEditor() {
         }
       }
 
+      await queryClient.invalidateQueries({ queryKey: ["instructor-courses"] });
+      await queryClient.invalidateQueries({ queryKey: ["courses"] });
+      window.localStorage.removeItem(draftKey);
       toast.success(isEdit ? "Course updated" : "Course created");
       navigate("/instructor/courses");
     } catch (error) {
@@ -246,6 +270,9 @@ export function CourseEditor() {
             <Field label="Language">
               <Input {...editorForm.register("language")} />
             </Field>
+            <Field label="Maximum seats (blank for unlimited)">
+              <Input type="number" min="1" placeholder="Unlimited" {...editorForm.register("maxSeats")} />
+            </Field>
             <div className="md:col-span-2">
               <Field label="Short description">
                 <Input {...editorForm.register("shortDescription")} />
@@ -262,7 +289,7 @@ export function CourseEditor() {
             <Field label="Upload thumbnail">
               <Input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/avif" onChange={handleThumbnailUpload} disabled={isUploadingThumbnail} />
             </Field>
-            <Field label="Preview video URL">
+            <Field label="Course promo video URL (optional)">
               <Input {...editorForm.register("previewVideoUrl")} />
             </Field>
             <div className="md:col-span-2">
@@ -365,6 +392,7 @@ function SectionEditor({ sectionIndex, control, register, setValue, removeSectio
                 content: "",
                 videoUrl: "",
                 fileUrl: "",
+                fileKey: "",
                 duration: 0,
                 isPreview: false,
                 order: lessonsArray.fields.length + 1,
@@ -398,17 +426,29 @@ function SectionEditor({ sectionIndex, control, register, setValue, removeSectio
 function LessonEditor({ sectionName, lessonIndex, control, register, setValue, removeLesson }) {
   const name = `${sectionName}.lessons.${lessonIndex}`;
   const lessonType = useWatch({ control, name: `${name}.type` });
+  const videoUrl = useWatch({ control, name: `${name}.videoUrl` });
+  const fileKey = useWatch({ control, name: `${name}.fileKey` });
+  const fileUrl = useWatch({ control, name: `${name}.fileUrl` });
+  const uploadedFileName = getUploadedFileName(fileKey);
+  const hasVideoUpload = Boolean(videoUrl || fileKey);
+  const hasPdfUpload = Boolean(fileUrl || fileKey);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+  const [showVideoTest, setShowVideoTest] = useState(false);
+  const [videoTestState, setVideoTestState] = useState("idle");
   const [isUploadingFile, setIsUploadingFile] = useState(false);
 
   const uploadLessonFile = async (file, folder) => {
-    const request = await uploadApi.requestLessonFileUpload({
-      fileName: file.name,
-      contentType: file.type,
-      folder,
-    });
-    await uploadApi.uploadToPresignedUrl(request.uploadUrl, file, file.type);
-    return request.fileUrl;
+    const storageConfig = await uploadApi.getConfig();
+    if (storageConfig.provider === "local") {
+      if (folder === "lessonVideos") {
+        const upload = await uploadApi.uploadLocalVideoResumable(file, ({ percent }) => setVideoUploadProgress(percent));
+        return { fileUrl: upload.fileUrl, fileKey: "" };
+      }
+      return uploadApi.uploadLocalFile(file, folder);
+    }
+    const upload = await uploadApi.uploadS3Multipart(file, folder, ({ percent }) => setVideoUploadProgress(percent));
+    return { fileUrl: "", fileKey: upload.fileKey };
   };
 
   const handleVideoUpload = async (event) => {
@@ -422,14 +462,19 @@ function LessonEditor({ sectionName, lessonIndex, control, register, setValue, r
     }
 
     setIsUploadingVideo(true);
+    setVideoUploadProgress(0);
     try {
-      const fileUrl = await uploadLessonFile(file, "lessonVideos");
-      setValue(`${name}.videoUrl`, fileUrl, { shouldDirty: true, shouldValidate: true });
+      const durationMinutes = await getVideoDurationInMinutes(file);
+      const upload = await uploadLessonFile(file, "lessonVideos");
+      setValue(`${name}.videoUrl`, upload.fileUrl, { shouldDirty: true, shouldValidate: true });
+      setValue(`${name}.fileKey`, upload.fileKey, { shouldDirty: true, shouldValidate: true });
+      setValue(`${name}.duration`, durationMinutes, { shouldDirty: true, shouldValidate: true });
       toast.success("Video uploaded");
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     } finally {
       setIsUploadingVideo(false);
+      setVideoUploadProgress(0);
       event.target.value = "";
     }
   };
@@ -446,8 +491,9 @@ function LessonEditor({ sectionName, lessonIndex, control, register, setValue, r
 
     setIsUploadingFile(true);
     try {
-      const fileUrl = await uploadLessonFile(file, "lessonPdfs");
-      setValue(`${name}.fileUrl`, fileUrl, { shouldDirty: true, shouldValidate: true });
+      const upload = await uploadLessonFile(file, "lessonPdfs");
+      setValue(`${name}.fileUrl`, upload.fileUrl, { shouldDirty: true, shouldValidate: true });
+      setValue(`${name}.fileKey`, upload.fileKey, { shouldDirty: true, shouldValidate: true });
       toast.success("PDF uploaded");
     } catch (error) {
       toast.error(getApiErrorMessage(error));
@@ -481,27 +527,87 @@ function LessonEditor({ sectionName, lessonIndex, control, register, setValue, r
           )}
         </Field>
         {lessonType === "video" ? (
-          <Field label="Video URL" name={`${name}.videoUrl`} register={register}>
-            {(field) => <Input {...field} />}
-          </Field>
-        ) : null}
-        {lessonType === "video" ? (
           <Field label="Upload video">
-            <Input type="file" accept="video/*" onChange={handleVideoUpload} disabled={isUploadingVideo} />
-          </Field>
-        ) : null}
-        {lessonType === "pdf" ? (
-          <Field label="PDF URL" name={`${name}.fileUrl`} register={register}>
-            {(field) => <Input {...field} />}
+            {hasVideoUpload ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => document.getElementById(`${name}-video-upload`)?.click()}
+                disabled={isUploadingVideo}
+              >
+                Replace video
+              </Button>
+            ) : null}
+            <Input
+              id={`${name}-video-upload`}
+              className={hasVideoUpload ? "hidden" : ""}
+              name={`${name}-video-upload`}
+              type="file"
+              accept="video/*"
+              onChange={handleVideoUpload}
+              disabled={isUploadingVideo}
+            />
+            {isUploadingVideo ? <p className="text-xs text-slate-500">Uploading video... {videoUploadProgress}%</p> : null}
+            {hasVideoUpload ? (
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <div className="min-w-0">
+                    <p className="font-semibold">Video upload successful</p>
+                    <p className="truncate text-emerald-700" title={uploadedFileName}>{uploadedFileName || "Video ready"}</p>
+                  </div>
+                </div>
+                {videoUrl ? <Button type="button" size="sm" variant="outline" onClick={() => { setShowVideoTest((visible) => !visible); setVideoTestState("idle"); }}>
+                  {showVideoTest ? "Hide video test" : "Test video"}
+                </Button> : <p className="text-xs text-slate-500">Save the course to enable playback preview.</p>}
+                {showVideoTest && videoUrl ? (
+                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950">
+                    <video controls preload="metadata" className="aspect-video w-full" src={videoUrl} onCanPlay={() => setVideoTestState("ready")} onError={() => setVideoTestState("error")} />
+                    <div className="flex items-center gap-2 px-3 py-2 text-xs text-white">
+                      {videoTestState === "ready" ? <><CheckCircle2 className="h-4 w-4 text-emerald-400" />Playback check passed.</> : videoTestState === "error" ? <><CircleAlert className="h-4 w-4 text-red-400" />Playback check failed.</> : "Press play to verify this lesson video."}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </Field>
         ) : null}
         {lessonType === "pdf" ? (
           <Field label="Upload PDF">
-            <Input type="file" accept="application/pdf" onChange={handlePdfUpload} disabled={isUploadingFile} />
+            {hasPdfUpload ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => document.getElementById(`${name}-pdf-upload`)?.click()}
+                disabled={isUploadingFile}
+              >
+                Replace PDF
+              </Button>
+            ) : null}
+            <Input
+              id={`${name}-pdf-upload`}
+              className={hasPdfUpload ? "hidden" : ""}
+              type="file"
+              accept="application/pdf"
+              onChange={handlePdfUpload}
+              disabled={isUploadingFile}
+            />
+            {isUploadingFile ? <p className="text-xs text-slate-500">Uploading PDF...</p> : null}
+            {hasPdfUpload ? (
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <div className="min-w-0">
+                  <p className="font-semibold">PDF upload successful</p>
+                  <p className="truncate text-emerald-700" title={getUploadedFileName(fileKey)}>{getUploadedFileName(fileKey) || "File ready"}</p>
+                </div>
+              </div>
+            ) : null}
           </Field>
         ) : null}
-        <Field label="Duration" name={`${name}.duration`} register={register}>
-          {(field) => <Input type="number" {...field} />}
+        <Field label={lessonType === "video" ? "Duration (minutes, automatic)" : "Duration (minutes)"} name={`${name}.duration`} register={register}>
+          {(field) => <Input {...field} type="number" readOnly={lessonType === "video"} />}
         </Field>
         <Field label="Order" name={`${name}.order`} register={register}>
           {(field) => <Input type="number" {...field} />}
@@ -518,6 +624,33 @@ function LessonEditor({ sectionName, lessonIndex, control, register, setValue, r
       </label>
     </Card>
   );
+}
+
+function getVideoDurationInMinutes(file) {
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    const objectUrl = URL.createObjectURL(file);
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      video.remove();
+    };
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      const seconds = Number(video.duration);
+      cleanup();
+      resolve(Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds / 60) : 0);
+    };
+    video.onerror = () => {
+      cleanup();
+      resolve(0);
+    };
+    video.src = objectUrl;
+  });
+}
+
+function getUploadedFileName(fileKey) {
+  const value = String(fileKey || "").split("/").pop() || "";
+  return value.replace(/^\d+-[a-f0-9]+-/i, "") || value;
 }
 
 function Field({ label, name, register, children }) {
@@ -537,15 +670,15 @@ function Field({ label, name, register, children }) {
   );
 }
 
-async function loadCourse(slug, form) {
-  const course = await courseApi.getBySlug(slug);
+async function loadCourse(courseId, form) {
+  const course = await courseApi.instructorDetails(courseId);
   const tagsText = (course.course.tags || []).join(", ");
   const sections = (course.sections || []).map((section, index) => ({
     _id: section._id,
     title: section.title,
     order: section.order || index + 1,
       lessons: (course.lessons || [])
-      .filter((lesson) => lesson.sectionId === section._id)
+      .filter((lesson) => String(lesson.sectionId) === String(section._id))
       .map((lesson, lessonIndex) => ({
         _id: lesson._id,
         title: lesson.title,
@@ -553,13 +686,14 @@ async function loadCourse(slug, form) {
         content: lesson.content || "",
         videoUrl: lesson.videoUrl || "",
         fileUrl: lesson.fileUrl || "",
+        fileKey: lesson.fileKey || "",
         duration: lesson.duration || 0,
         isPreview: Boolean(lesson.isPreview),
         order: lesson.order || lessonIndex + 1,
       })),
   }));
 
-  form.reset({
+  const values = {
     title: course.course.title || "",
     description: course.course.description || "",
     shortDescription: course.course.shortDescription || "",
@@ -569,10 +703,22 @@ async function loadCourse(slug, form) {
     discountPrice: course.course.discountPrice || 0,
     level: course.course.level || "beginner",
     language: course.course.language || "en",
-    categoryId: course.course.categoryId || "",
+    categoryId: course.course.categoryId ? String(course.course.categoryId) : "",
     tagsText,
     isPublished: Boolean(course.course.isPublished),
     isFeatured: Boolean(course.course.isFeatured),
+    maxSeats: course.course.maxSeats ?? null,
     sections,
-  });
+  };
+  const draft = readCourseDraft(`skillnest-course-draft:${courseId}`);
+  form.reset(draft ? { ...values, ...draft, sections: draft.sections || values.sections } : values);
+}
+
+function readCourseDraft(key) {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
 }

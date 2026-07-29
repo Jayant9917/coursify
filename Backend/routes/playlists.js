@@ -9,6 +9,7 @@ const router = Router();
 router.post("/import", requireAuth, validate(playlistImportSchema), playlistController.import);
 router.get("/me", requireAuth, validate(playlistListSchema, "query"), playlistController.me);
 router.get("/:id", requireAuth, validate(playlistIdSchema, "params"), playlistController.getById);
+router.delete("/:id", requireAuth, validate(playlistIdSchema, "params"), playlistController.remove);
 router.get("/:id/watch", requireAuth, validate(playlistIdSchema, "params"), playlistController.watch);
 router.patch("/:id/progress", requireAuth, validate(playlistIdSchema, "params"), validate(playlistProgressSchema), playlistController.progress);
 router.post("/:id/refresh", requireAuth, validate(playlistIdSchema, "params"), playlistController.refresh);

@@ -1,9 +1,9 @@
 import React from "react";
 import { cn } from "@/utils/cn";
 
-export function Button({ className, variant = "default", size = "default", asChild = false, children, ...props }) {
+export const Button = React.forwardRef(function Button({ className, variant = "default", size = "default", asChild = false, children, ...props }, ref) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:pointer-events-none disabled:opacity-50";
+    "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
   const variants = {
     default: "bg-[#171717] text-white hover:bg-lime-400 hover:text-black dark:bg-white dark:text-black dark:hover:bg-lime-300",
     secondary: "bg-neutral-100 text-neutral-900 hover:bg-lime-200 dark:bg-neutral-800 dark:text-white dark:hover:bg-neutral-700",
@@ -20,17 +20,19 @@ export function Button({ className, variant = "default", size = "default", asChi
   if (asChild && React.isValidElement(children)) {
     return React.cloneElement(children, {
       className: cn(base, variants[variant], sizes[size], className, children.props.className),
+      ref,
       ...props,
     });
   }
 
   const Comp = "button";
   return (
-    <Comp className={cn(base, variants[variant], sizes[size], className)} {...props}>
+    <Comp ref={ref} className={cn(base, variants[variant], sizes[size], className)} {...props}>
       {children}
     </Comp>
   );
-}
+});
+Button.displayName = "Button";
 
 export const Input = React.forwardRef(function Input({ className, ...props }, ref) {
   return (
@@ -122,10 +124,10 @@ export function Skeleton({ className, ...props }) {
   return <div className={cn("animate-pulse rounded-md bg-slate-200 dark:bg-neutral-800", className)} {...props} />;
 }
 
-export function Progress({ value = 0, className, ...props }) {
+export function Progress({ value = 0, className, indicatorClassName, ...props }) {
   return (
     <div className={cn("h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-neutral-800", className)} {...props}>
-      <div className="h-full rounded-full bg-slate-900 transition-all dark:bg-lime-300" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+      <div className={cn("h-full rounded-full bg-slate-900 transition-all dark:bg-lime-300", indicatorClassName)} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
     </div>
   );
 }

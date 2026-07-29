@@ -472,8 +472,6 @@ const demoNotes = [
   },
 ];
 
-const makeKey = (obj) => Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined));
-
 async function upsertUser(data) {
   const passwordHash = await bcrypt.hash(data.password, config.bcryptSaltRounds);
   return User.findOneAndUpdate(
@@ -565,7 +563,7 @@ async function main() {
   const instructor = await upsertUser(DEMO.instructor);
   const instructor2 = await upsertUser(DEMO.instructor2);
   const student = await upsertUser(DEMO.student);
-  const defaultUser = await upsertUser(DEMO.defaultUser);
+  await upsertUser(DEMO.defaultUser);
 
   const categories = new Map();
   for (const category of demoCategories) {
@@ -677,7 +675,6 @@ async function main() {
   }
 
   const firstCourse = courses.get("modern-react-from-zero-to-production");
-  const firstSections = await CourseSection.find({ courseId: firstCourse._id }).sort({ order: 1 });
   const firstLessons = await Lesson.find({ courseId: firstCourse._id }).sort({ order: 1 });
 
   await Review.findOneAndUpdate(

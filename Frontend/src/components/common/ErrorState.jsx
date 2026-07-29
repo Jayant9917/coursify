@@ -1,9 +1,9 @@
 import { Button, Card } from "@/components/ui";
 import { TriangleAlert } from "lucide-react";
 
-export function ErrorState({ title = "Something went wrong", description, onRetry }) {
+export function ErrorState({ title = "Something went wrong", description, onRetry, className = "" }) {
   return (
-    <Card className="border-red-200 bg-red-50/60 dark:border-red-950 dark:bg-red-950/30">
+    <Card className={className || "border-red-200 bg-red-50/60 dark:border-red-950 dark:bg-red-950/30"}>
       <div className="flex flex-col items-center gap-4 p-8 text-center">
         <TriangleAlert aria-hidden="true" className="h-10 w-10 text-red-600 dark:text-red-400" />
         <div>

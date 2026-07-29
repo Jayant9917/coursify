@@ -32,7 +32,7 @@ export function CourseManagement() {
   const remove = async (course) => {
     try {
       await courseApi.remove(course._id);
-      toast.success("Course deleted");
+      toast.success("Course archived");
       coursesQuery.refetch();
     } catch (error) {
       toast.error(getApiErrorMessage(error));
@@ -61,13 +61,15 @@ export function CourseManagement() {
                     <Link to={`/courses/${course.slug}`}>View</Link>
                   </Button>
                   <Badge variant="outline">{formatPrice(course.discountPrice || course.price)}</Badge>
-                  <Badge variant="secondary">{course.enrollmentCount || 0} enrolled</Badge>
+                  <Badge variant="secondary">
+                    {course.maxSeats ? `${course.enrollmentCount || 0}/${course.maxSeats} seats` : `${course.enrollmentCount || 0} enrolled`}
+                  </Badge>
                   <Badge variant={course.isPublished ? "success" : "secondary"}>{course.isPublished ? "Published" : "Draft"}</Badge>
                   <Button variant="outline" onClick={() => togglePublish(course)}>
                     {course.isPublished ? "Unpublish" : "Publish"}
                   </Button>
                   <Button variant="destructive" onClick={() => remove(course)}>
-                    Delete
+                    Archive
                   </Button>
                 </div>
               </div>

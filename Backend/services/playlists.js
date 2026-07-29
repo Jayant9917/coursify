@@ -1,4 +1,3 @@
-const mongoose = require("mongoose");
 const ApiError = require("../utils/apiError");
 const paginate = require("../utils/paginate");
 const { ImportedPlaylist, ImportedPlaylistVideo } = require("../models");
@@ -148,6 +147,20 @@ const playlistService = {
     return normalizePlaylistDoc(playlist);
   },
 
+  async remove(actor, playlistId) {
+    const playlist = await ImportedPlaylist.findById(playlistId);
+    if (!playlist) {
+      throw new ApiError(404, "Playlist not found");
+    }
+    if (!isOwnerOrAdmin(actor, playlist.userId)) {
+      throw new ApiError(403, "You do not have permission to delete this playlist");
+    }
+
+    await ImportedPlaylistVideo.deleteMany({ playlistId: playlist._id });
+    await playlist.deleteOne();
+    return { success: true, id: String(playlist._id) };
+  },
+
   async watch(actor, playlistId) {
     const playlist = await ImportedPlaylist.findById(playlistId);
     if (!playlist) {
@@ -180,6 +193,9 @@ const playlistService = {
     if (!video) {
       throw new ApiError(404, "Playlist video not found");
     }
+    if (!video.isAvailable) {
+      throw new ApiError(410, "This YouTube video is no longer available.", [], "YOUTUBE_VIDEO_UNAVAILABLE");
+    }
 
     const watchedSeconds = Math.max(0, Number(payload.currentTimeSeconds) || 0);
     const durationSeconds = Math.max(0, Number(payload.durationSeconds) || video.durationSeconds || 0);
@@ -207,7 +223,18 @@ const playlistService = {
       throw new ApiError(403, "You do not have permission to refresh this playlist");
     }
 
-    const meta = await fetchYouTubePlaylistDetails(playlist.youtubePlaylistId);
+    let meta;
+    try {
+      meta = await fetchYouTubePlaylistDetails(playlist.youtubePlaylistId);
+    } catch (error) {
+      if (error?.code === "YOUTUBE_NOT_FOUND" || error?.code === "YOUTUBE_RESOURCE_UNAVAILABLE") {
+        playlist.isAvailable = false;
+        await ImportedPlaylistVideo.updateMany({ playlistId }, { $set: { isAvailable: false } });
+        await playlist.save();
+        return normalizePlaylistDoc(playlist);
+      }
+      throw error;
+    }
     const existingVideos = await ImportedPlaylistVideo.find({ playlistId }).sort({ position: 1 });
     const existingMap = new Map(existingVideos.map((video) => [String(video.youtubeVideoId), video]));
     const seenIds = new Set();
@@ -251,6 +278,7 @@ const playlistService = {
     playlist.description = meta.description;
     playlist.thumbnailUrl = meta.thumbnailUrl;
     playlist.channelTitle = meta.channelTitle;
+    playlist.isAvailable = true;
     await playlist.save();
 
     const savedPlaylist = await recomputePlaylistStats(playlistId);

@@ -12,21 +12,21 @@ const {
   Enrollment,
   Order,
   OrderItem,
+  CourseSeatReservation,
   Coupon,
   Note,
   NotePurchase,
 } = require("../../models");
-const { enrollmentService, orderService, canDownloadNote } = require("../../services");
+const { enrollmentService, orderService, canDownloadNote, expirePendingOrders } = require("../../services");
 
 const hasTestDatabase = Boolean(config.testMongoUrl);
-const describeDatabase = hasTestDatabase ? test : test;
 
 test.before(async () => {
   if (!hasTestDatabase) return;
   await mongoose.connect(config.testMongoUrl, { serverSelectionTimeoutMS: 5000 });
   await Promise.all([
     User.deleteMany({}), Course.deleteMany({}), CourseSection.deleteMany({}), Lesson.deleteMany({}),
-    Enrollment.deleteMany({}), Order.deleteMany({}), OrderItem.deleteMany({}), Coupon.deleteMany({}),
+    Enrollment.deleteMany({}), Order.deleteMany({}), OrderItem.deleteMany({}), CourseSeatReservation.deleteMany({}), Coupon.deleteMany({}),
     Note.deleteMany({}), NotePurchase.deleteMany({}),
   ]);
 });
@@ -55,6 +55,41 @@ test("paid enrollment protection rejects a student without a paid order", async 
     (error) => error.statusCode === 402
   );
   assert.equal(await Enrollment.countDocuments({ userId: student._id, courseId: course._id }), 0);
+});
+
+test("atomic course capacity allows only one concurrent final-seat enrollment", async (t) => {
+  if (!requireDatabase()) return t.skip("TEST_MONGODB_URL is not configured");
+  const { student, course } = await createFixture({ price: 0 });
+  course.maxSeats = 1;
+  await course.save();
+  const secondStudent = await User.create({ name: "Second Student", email: `student-two-${Date.now()}@test.local`, passwordHash: "hash", role: "student" });
+
+  const results = await Promise.allSettled([
+    enrollmentService.enroll({ id: student._id, role: "student" }, { courseId: course._id }),
+    enrollmentService.enroll({ id: secondStudent._id, role: "student" }, { courseId: course._id }),
+  ]);
+
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(results.filter((result) => result.status === "rejected" && result.reason.statusCode === 409).length, 1);
+  const savedCourse = await Course.findById(course._id).select("+reservedSeats").lean();
+  assert.equal(savedCourse.enrollmentCount, 1);
+  assert.equal(savedCourse.reservedSeats, 0);
+});
+
+test("expired pending checkout releases its reserved seat", async (t) => {
+  if (!requireDatabase()) return t.skip("TEST_MONGODB_URL is not configured");
+  const { student, course } = await createFixture({ price: 1000 });
+  course.maxSeats = 1;
+  course.reservedSeats = 1;
+  await course.save();
+  const order = await Order.create({ userId: student._id, amount: 1000, currency: "INR", status: "pending", expiresAt: new Date(Date.now() - 1000) });
+  await OrderItem.create({ orderId: order._id, courseId: course._id, priceAtPurchase: 1000 });
+  const reservation = await CourseSeatReservation.create({ courseId: course._id, userId: student._id, orderId: order._id, expiresAt: new Date(Date.now() - 1000) });
+
+  assert.equal(await expirePendingOrders(), 1);
+  assert.equal((await Order.findById(order._id)).status, "failed");
+  assert.equal((await CourseSeatReservation.findById(reservation._id)).status, "expired");
+  assert.equal((await Course.findById(course._id).select("+reservedSeats")).reservedSeats, 0);
 });
 
 test("refunded enrollment cannot access lesson media", async (t) => {

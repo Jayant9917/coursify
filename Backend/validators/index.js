@@ -63,6 +63,7 @@ const courseSchema = z.object({
   tags: z.array(z.string()).optional(),
   isPublished: z.boolean().optional(),
   isFeatured: z.boolean().optional(),
+  maxSeats: z.coerce.number().int().min(1).nullable().optional(),
 });
 
 const courseUpdateSchema = courseSchema.partial();

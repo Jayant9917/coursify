@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { findCourseById, getEnrollmentForCourse, groupLessonsBySection, normalizeId } from "@/utils/courseUtils";
 import { getPreviousRoute } from "@/utils/routeHistory";
 import { stripHtml } from "@/utils/sanitizeHtml";
-import { getApiErrorMessage } from "@/services/api";
+import { courseApi, getApiErrorMessage } from "@/services/api";
 import { toast } from "sonner";
 
 export function LessonPlayer() {
@@ -23,6 +23,8 @@ export function LessonPlayer() {
   const progressQuery = useCourseProgress(id);
   const updateProgress = useUpdateProgress();
   const [currentLessonId, setCurrentLessonId] = useState("");
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaError, setMediaError] = useState("");
 
   const catalog = courseCatalogQuery.data?.data || courseCatalogQuery.data || [];
   const courseSummary = findCourseById(catalog, id);
@@ -49,6 +51,23 @@ export function LessonPlayer() {
   }, [currentLessonId, enrollment, lessons]);
 
   const currentLesson = lessons.find((lesson) => normalizeId(lesson._id) === normalizeId(currentLessonId));
+
+  useEffect(() => {
+    let active = true;
+    setMediaUrl("");
+    setMediaError("");
+    if (!currentLesson || !["video", "pdf"].includes(currentLesson.type)) return undefined;
+
+    courseApi.getLessonAccessUrl(id, currentLesson._id)
+      .then((result) => {
+        if (active) setMediaUrl(result.url || "");
+      })
+      .catch((error) => {
+        if (active) setMediaError(getApiErrorMessage(error));
+      });
+
+    return () => { active = false; };
+  }, [id, currentLesson]);
 
   if (courseCatalogQuery.isLoading || enrollmentsQuery.isLoading || progressQuery.isLoading) return <LoadingSpinner />;
   if (courseCatalogQuery.isError) return <ErrorState description="We could not load your course list." onRetry={() => courseCatalogQuery.refetch()} />;
@@ -123,13 +142,13 @@ export function LessonPlayer() {
                 <p>Select a lesson to begin.</p>
               </div>
             ) : currentLesson.type === "video" ? (
-              <video controls className="w-full" src={currentLesson.videoUrl || currentLesson.content} />
+              mediaUrl ? <video controls className="w-full" src={mediaUrl} /> : <div className="grid min-h-[420px] place-items-center text-white"><p>{mediaError || "Loading lesson video..."}</p></div>
             ) : currentLesson.type === "pdf" ? (
               <div className="space-y-3 bg-white p-4">
-                <iframe title={currentLesson.title} src={currentLesson.fileUrl || currentLesson.content || currentLesson.videoUrl} className="h-[520px] w-full bg-white" />
-                {currentLesson.fileUrl ? (
+                {mediaUrl ? <iframe title={currentLesson.title} src={mediaUrl} className="h-[520px] w-full bg-white" /> : <p className="p-4 text-slate-600">{mediaError || "Loading PDF..."}</p>}
+                {mediaUrl ? (
                   <a
-                    href={currentLesson.fileUrl}
+                    href={mediaUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
