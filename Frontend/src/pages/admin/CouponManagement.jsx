@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,18 +10,22 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorState } from "@/components/common/ErrorState";
 import { EmptyState } from "@/components/common/EmptyState";
 import { formatDate } from "@/utils/formatDate";
+import { getApiErrorMessage } from "@/services/api";
 
 const schema = z.object({
   code: z.string().min(2),
   type: z.enum(["percent", "fixed"]),
   value: z.coerce.number().min(0),
+  maxRedemptions: z.coerce.number().int().min(1).optional(),
+  expiresAt: z.string().optional(),
 });
 
 export function CouponManagement() {
   const couponsQuery = useQuery({ queryKey: ["coupons"], queryFn: () => couponApi.list() });
+  const [editingId, setEditingId] = useState(null);
   const form = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { code: "", type: "percent", value: 0 },
+    defaultValues: { code: "", type: "percent", value: 0, maxRedemptions: 1, expiresAt: "" },
   });
 
   if (couponsQuery.isLoading) return <LoadingSpinner />;
@@ -29,12 +33,19 @@ export function CouponManagement() {
 
   const submit = form.handleSubmit(async (values) => {
     try {
-      await couponApi.create(values);
-      toast.success("Coupon created");
-      form.reset({ code: "", type: "percent", value: 0 });
+      const payload = { ...values, expiresAt: values.expiresAt || null };
+      if (editingId) {
+        await couponApi.update(editingId, payload);
+        toast.success("Coupon updated");
+      } else {
+        await couponApi.create(payload);
+        toast.success("Coupon created");
+      }
+      setEditingId(null);
+      form.reset({ code: "", type: "percent", value: 0, maxRedemptions: 1, expiresAt: "" });
       couponsQuery.refetch();
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Unable to create coupon");
+      toast.error(getApiErrorMessage(error));
     }
   });
 
@@ -47,7 +58,7 @@ export function CouponManagement() {
       </Card>
 
       <Card className="p-6">
-        <h2 className="text-xl font-bold">Create coupon</h2>
+        <h2 className="text-xl font-bold">{editingId ? "Edit coupon" : "Create coupon"}</h2>
         <form className="mt-4 grid gap-4 md:grid-cols-3" onSubmit={submit}>
           <Field label="Code">
             <Input {...form.register("code")} />
@@ -61,8 +72,15 @@ export function CouponManagement() {
           <Field label="Value">
             <Input type="number" {...form.register("value")} />
           </Field>
-          <div className="md:col-span-3">
-            <Button type="submit">Add coupon</Button>
+          <Field label="Maximum redemptions">
+            <Input type="number" {...form.register("maxRedemptions")} />
+          </Field>
+          <Field label="Expiry date">
+            <Input type="date" {...form.register("expiresAt")} />
+          </Field>
+          <div className="flex items-end gap-2 md:col-span-3">
+            <Button type="submit">{editingId ? "Save coupon" : "Add coupon"}</Button>
+            {editingId ? <Button type="button" variant="outline" onClick={() => { setEditingId(null); form.reset({ code: "", type: "percent", value: 0, maxRedemptions: 1, expiresAt: "" }); }}>Cancel</Button> : null}
           </div>
         </form>
       </Card>
@@ -80,7 +98,17 @@ export function CouponManagement() {
                     {coupon.type} - {coupon.value}
                   </p>
                 </div>
-                <p className="text-sm text-slate-500">{formatDate(coupon.expiresAt)}</p>
+                <div className="text-right">
+                  <p className="text-sm text-slate-500">{coupon.expiresAt ? formatDate(coupon.expiresAt) : "No expiry"}</p>
+                  <p className="text-xs text-slate-400">{coupon.redeemedCount || 0} redeemed / {coupon.maxRedemptions}</p>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <Button variant="outline" onClick={() => { setEditingId(coupon._id); form.reset({ code: coupon.code, type: coupon.type, value: coupon.value, maxRedemptions: coupon.maxRedemptions, expiresAt: coupon.expiresAt ? String(coupon.expiresAt).slice(0, 10) : "" }); }}>Edit</Button>
+                {coupon.isActive ? <Button variant="outline" onClick={async () => {
+                  if (!window.confirm(`Deactivate coupon ${coupon.code}?`)) return;
+                  try { await couponApi.remove(coupon._id); toast.success("Coupon deactivated"); couponsQuery.refetch(); } catch (error) { toast.error(getApiErrorMessage(error)); }
+                }}>Deactivate</Button> : null}
               </div>
             </Card>
           ))}

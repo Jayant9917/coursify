@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { brand } from "@/utils/brand";
 import { authApi, setStoredRefreshToken, getApiErrorMessage } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
@@ -13,21 +14,21 @@ const schema = z.object({
   email: z.string().email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   role: z.enum(["student", "instructor"]),
-  avatar: z.string().optional(),
   bio: z.string().optional(),
 });
 
 export function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { accessToken, user, setAuth } = useAuth();
+  const requestedRole = searchParams.get("role") === "instructor" ? "instructor" : "student";
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       name: "",
       email: "",
       password: "",
-      role: "student",
-      avatar: "",
+      role: requestedRole,
       bio: "",
     },
   });
@@ -55,7 +56,7 @@ export function Register() {
       <Card className="w-full max-w-md border-slate-200 p-6">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Create account</p>
-          <h1 className="mt-2 text-3xl font-black text-slate-950">Join Coursify</h1>
+          <h1 className="mt-2 text-3xl font-black text-slate-950">Join {brand.name}</h1>
         </div>
         <form className="mt-8 space-y-4" onSubmit={submit}>
           <Field label="Name" error={form.formState.errors.name?.message}>
@@ -72,9 +73,6 @@ export function Register() {
               <option value="student">Student</option>
               <option value="instructor">Instructor</option>
             </Select>
-          </Field>
-          <Field label="Avatar URL">
-            <Input placeholder="https://..." {...form.register("avatar")} />
           </Field>
           <Field label="Bio">
             <Textarea rows={3} placeholder="Tell us about yourself" {...form.register("bio")} />

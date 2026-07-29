@@ -1,0 +1,216 @@
+COURSIFY HANDAFF SUMMARY - 2026-07-13
+
+This file is the fastest way to understand what the project is, what we already built, and what still needs to be done.
+
+1. What Coursify is
+
+Coursify is a course platform.
+It is being built to support:
+- public course browsing
+- student accounts
+- instructor accounts
+- admin management
+- course creation
+- lesson building
+- checkout and payment later
+- uploads for avatars, thumbnails, and lesson files
+
+The goal is to grow it from an early MVP into a client-ready course website.
+
+2. Current technology stack
+
+Backend:
+- Node.js
+- Express
+- MongoDB
+- Mongoose
+- JWT auth
+- bcryptjs
+- Zod validation
+
+Frontend:
+- React
+- Vite
+- React Router
+- React Hook Form
+- Zod
+- Zustand
+- TanStack Query
+- Axios
+- Tailwind CSS
+
+Media:
+- Cloudinary for image uploads right now
+- AWS S3 planned later for PDFs and videos
+
+Payments:
+- Lemon Squeezy planned later
+
+3. What we have already implemented
+
+Authentication and security:
+- register
+- login
+- logout
+- token refresh
+- persistent refresh tokens stored in MongoDB
+- rate limiting on login and register
+- security headers
+- role-based access
+
+Password recovery:
+- forgot password route
+- reset password route
+- reset token stored safely in MongoDB
+- dev-only reset token return so you can test without email provider
+
+Uploads:
+- Cloudinary image upload helper
+- authenticated upload endpoint for logged-in users
+- public upload endpoint for signup avatars
+- profile avatar upload UI
+- course thumbnail upload UI
+- signup avatar upload UI
+
+Course platform core:
+- public course list
+- course detail page
+- student dashboard pages
+- instructor dashboard pages
+- admin dashboard pages
+- course create/edit page
+- sections and lessons
+- wishlist
+- enrollments
+- orders
+- coupons
+- reviews
+- notifications
+
+Frontend safety and cleanup:
+- removed unsafe HTML rendering in key places
+- added helper utilities for file-to-base64 upload flow
+- added basic upload UI states
+
+4. Important business logic now in the backend
+
+The backend is now the source of truth for most important platform behavior:
+- who can create/edit courses
+- who can upload avatars or course thumbnails
+- who can enroll
+- how coupons are validated
+- how discounts are calculated
+- how refresh tokens are managed
+- how password reset tokens are managed
+
+This is important because the frontend should only send user intent.
+The backend should decide what is valid.
+
+5. Database design direction
+
+We are using MongoDB collections for:
+- users
+- categories
+- courses
+- course sections
+- lessons
+- enrollments
+- orders
+- order items
+- reviews
+- wishlists
+- course progress
+- coupons
+- notifications
+- refresh tokens
+- password reset tokens
+
+For uploaded files:
+- only URLs should be stored in MongoDB
+- actual file binary should not go into the database
+
+6. What is currently working in uploads
+
+Images:
+- avatars go to Cloudinary
+- course thumbnails go to Cloudinary
+
+Password reset testing:
+- in development, forgot-password returns the reset token so testing is easy
+
+What is still not uploaded yet:
+- PDFs
+- lesson videos
+- large file handling
+- streaming setup
+
+7. What is still left
+
+Media:
+- S3 for PDFs
+- S3 for videos
+- lesson-level file upload UI
+- video streaming or protected media access
+
+Payments:
+- Lemon Squeezy checkout
+- webhook handling
+- paid order confirmation
+- auto-enrollment after payment
+
+Auth:
+- real email provider for password reset in production
+
+Product polish:
+- admin CRUD improvements
+- mobile UI polish
+- bundle splitting for heavy frontend areas
+
+8. Main decisions already made
+
+- MongoDB is the database
+- React + Vite is the frontend
+- Cloudinary is the image provider
+- S3 will be used later for heavier files
+- Lemon Squeezy will be used later for payments
+- backend should stay the source of truth
+- store only URLs for uploaded files
+
+9. The most important files to know
+
+Backend:
+- `Backend/services/index.js` = business logic
+- `Backend/controllers/index.js` = route handlers
+- `Backend/routes/auth.js` = auth routes
+- `Backend/routes/uploads.js` = upload routes
+- `Backend/models/index.js` = MongoDB schemas
+- `Backend/validators/index.js` = request validation
+- `Backend/utils/cloudinary.js` = Cloudinary upload helper
+- `Backend/utils/passwordResetStore.js` = password reset token store
+- `Backend/utils/tokenStore.js` = refresh token store
+
+Frontend:
+- `Frontend/src/services/api.js` = API calls
+- `Frontend/src/routes/index.jsx` = app routing
+- `Frontend/src/pages/public/Login.jsx` = login page
+- `Frontend/src/pages/public/Register.jsx` = signup page
+- `Frontend/src/pages/public/ForgotPassword.jsx` = forgot password page
+- `Frontend/src/pages/public/ResetPassword.jsx` = reset password page
+- `Frontend/src/pages/student/Profile.jsx` = profile avatar upload
+- `Frontend/src/pages/instructor/CourseEditor.jsx` = course thumbnail upload
+
+10. How to restart later
+
+When we return to the project, the best order is:
+- read `README.md` in this folder
+- read `01-current-state.md`
+- read `02-completed-today.md`
+- read `03-phases-and-roadmap.md`
+- read `04-api-map.md`
+- then continue from `06-open-items.md`
+
+11. Short summary of today
+
+Today we made the auth and media foundation stronger.
+We added Cloudinary image uploads, a public avatar upload path for signup, forgot-password and reset-password support, MongoDB-backed token stores, rate limiting, security headers, and documentation for the project restart.
+

@@ -1,0 +1,18 @@
+FREEZE NOTE
+
+S3 work is paused.
+
+Reason:
+- The AWS account currently does not have permission to create the bucket needed for testing and deployment.
+
+What this means:
+- Do not continue implementing new S3 features for now.
+- Keep the current progress recorded in this folder.
+- Move to a different feature area until the bucket permission is available.
+
+When permission becomes available, the next S3 steps should be:
+- finalize private bucket settings
+- verify presigned upload flow
+- verify presigned playback/download flow
+- test with real lesson videos and PDFs
+

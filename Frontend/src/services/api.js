@@ -21,8 +21,73 @@ export function setStoredRefreshToken(token) {
   }
 }
 
+const readableFieldName = (path) =>
+  String(path || "")
+    .split(".")
+    .filter(Boolean)
+    .map((part) => part.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase()))
+    .join(" ");
+
+const formatValidationError = (item) => {
+  if (typeof item === "string") return item;
+
+  const field = readableFieldName(Array.isArray(item?.path) ? item.path.join(".") : item?.path);
+  if (item?.code === "too_small" && item?.type === "string") {
+    return `${field || "This field"} must be at least ${item.minimum} characters.`;
+  }
+  if (item?.code === "too_big" && item?.type === "string") {
+    return `${field || "This field"} must be no more than ${item.maximum} characters.`;
+  }
+  if (item?.code === "invalid_string" && item?.validation === "email") {
+    return `${field || "Email"} must be a valid email address.`;
+  }
+  if (item?.code === "invalid_type" && item?.received === "undefined") {
+    return `${field || "This field"} is required.`;
+  }
+
+  const message = item?.message || item?.msg || item?.reason;
+  return message ? (field ? `${field}: ${message}` : message) : "Please check the submitted information.";
+};
+
+const statusFallbackMessage = (status) => {
+  if (status === 400) return "The request could not be processed. Please check your information.";
+  if (status === 401) return "Your session is invalid or has expired. Please sign in again.";
+  if (status === 403) return "You do not have permission to perform this action.";
+  if (status === 404) return "The requested resource was not found.";
+  if (status === 409) return "This action conflicts with existing data.";
+  if (status === 429) return "Too many attempts. Please wait a moment and try again.";
+  if (status === 502) return "The external service could not complete the request. Please try again.";
+  if (status === 503) return "This service is temporarily unavailable. Please try again later.";
+  if (status === 504) return "The request took too long. Please try again.";
+  return "Something went wrong on our side. Please try again.";
+};
+
+const isInternalErrorMessage = (message) =>
+  /Mongo|Mongoose|MongoServerError|TypeError|ReferenceError|SyntaxError|ECONN|ETIMEDOUT|at\s+\w+\s*\(/i.test(
+    String(message || "")
+  );
+
 function getErrorMessage(error) {
-  return error?.response?.data?.message || error?.message || "Something went wrong";
+  const response = error?.response?.data || {};
+  const status = error?.response?.status;
+  const validationErrors = Array.isArray(response.errors) ? response.errors : [];
+  const messages = validationErrors.map(formatValidationError).filter(Boolean);
+
+  if (messages.length > 0 && response.message === "Validation failed") {
+    return messages.join(". ");
+  }
+
+  if (response.message && !isInternalErrorMessage(response.message)) {
+    return response.message;
+  }
+
+  if (messages.length > 0) return messages.join(". ");
+  if (!error?.response) {
+    if (error?.code === "ERR_CANCELED") return "The request was canceled.";
+    return "Unable to reach the server. Please check your connection and try again.";
+  }
+
+  return statusFallbackMessage(status);
 }
 
 export function getApiErrorMessage(error) {
@@ -35,28 +100,39 @@ function unwrap(response) {
 
 let refreshPromise = null;
 
-export async function refreshSession() {
-  const refreshToken = getStoredRefreshToken();
-  if (!refreshToken) {
-    throw new Error("No refresh token available");
-  }
+export function refreshSession() {
+  if (refreshPromise) return refreshPromise;
 
-  const { data } = await api.post(
-    "/auth/refresh",
-    { refreshToken },
-    { skipAuthRefresh: true }
+  const promise = (async () => {
+    const refreshToken = getStoredRefreshToken();
+    if (!refreshToken) {
+      throw new Error("No refresh token available");
+    }
+
+    const { data } = await api.post(
+      "/auth/refresh",
+      { refreshToken },
+      { skipAuthRefresh: true }
+    );
+
+    const payload = data?.data ?? {};
+    if (payload.refreshToken) {
+      setStoredRefreshToken(payload.refreshToken);
+    }
+
+    if (payload.user && payload.accessToken) {
+      useAuthStore.getState().setAuth(payload.user, payload.accessToken);
+    }
+
+    return payload;
+  })();
+
+  refreshPromise = promise;
+  promise.then(
+    () => { if (refreshPromise === promise) refreshPromise = null; },
+    () => { if (refreshPromise === promise) refreshPromise = null; }
   );
-
-  const payload = data?.data ?? {};
-  if (payload.refreshToken) {
-    setStoredRefreshToken(payload.refreshToken);
-  }
-
-  if (payload.user && payload.accessToken) {
-    useAuthStore.getState().setAuth(payload.user, payload.accessToken);
-  }
-
-  return payload;
+  return promise;
 }
 
 api.interceptors.request.use((config) => {
@@ -87,8 +163,7 @@ api.interceptors.response.use(
     originalRequest._retry = true;
 
     try {
-      refreshPromise = refreshPromise || refreshSession();
-      const refreshed = await refreshPromise;
+      const refreshed = await refreshSession();
       const accessToken = refreshed?.accessToken || useAuthStore.getState().accessToken;
 
       if (accessToken) {
@@ -106,8 +181,6 @@ api.interceptors.response.use(
       }
 
       return Promise.reject(refreshError);
-    } finally {
-      refreshPromise = null;
     }
   }
 );
@@ -131,6 +204,14 @@ export const authApi = {
       await api.post("/auth/logout", { refreshToken }, { skipAuthRefresh: true });
     }
     setStoredRefreshToken(null);
+  },
+  async forgotPassword(payload) {
+    const response = await api.post("/auth/forgot-password", payload, { skipAuthRefresh: true });
+    return unwrap(response);
+  },
+  async resetPassword(payload) {
+    const response = await api.post("/auth/reset-password", payload, { skipAuthRefresh: true });
+    return unwrap(response);
   },
 };
 
@@ -226,6 +307,10 @@ export const courseApi = {
     const response = await api.get(`/courses/${id}/progress`);
     return unwrap(response);
   },
+  async getLessonAccessUrl(courseId, lessonId) {
+    const response = await api.get(`/courses/${courseId}/lessons/${lessonId}/access`);
+    return unwrap(response);
+  },
 };
 
 export const categoryApi = {
@@ -239,6 +324,10 @@ export const categoryApi = {
   },
   async update(id, payload) {
     const response = await api.put(`/categories/${id}`, payload);
+    return unwrap(response);
+  },
+  async remove(id) {
+    const response = await api.delete(`/categories/${id}`);
     return unwrap(response);
   },
 };
@@ -285,6 +374,18 @@ export const orderApi = {
     const response = await api.get("/orders", { params: query });
     return unwrap(response);
   },
+  async adminDetails(id) {
+    const response = await api.get(`/orders/${id}`);
+    return unwrap(response);
+  },
+  async adminRefund(id) {
+    const response = await api.post(`/orders/${id}/refund`);
+    return unwrap(response);
+  },
+  async webhookMonitoring(limit = 50) {
+    const response = await api.get("/orders/webhook-monitoring", { params: { limit } });
+    return unwrap(response);
+  },
 };
 
 export const wishlistApi = {
@@ -302,6 +403,49 @@ export const wishlistApi = {
   },
 };
 
+export const notesApi = {
+  async list(query = {}) {
+    const response = await api.get("/notes", { params: query });
+    return unwrap(response);
+  },
+  async getBySlug(slug) {
+    const response = await api.get(`/notes/${slug}`);
+    return unwrap(response);
+  },
+  async purchase(id) {
+    const response = await api.post(`/notes/${id}/purchase`);
+    return unwrap(response);
+  },
+  async checkout(id) {
+    const response = await api.post("/orders", { noteIds: [id] });
+    return unwrap(response);
+  },
+  async download(id) {
+    const response = await api.get(`/notes/${id}/download`);
+    return unwrap(response);
+  },
+  async myPurchases() {
+    const response = await api.get("/notes/purchases/me");
+    return unwrap(response);
+  },
+  async listMine() {
+    const response = await api.get("/notes/instructor/me");
+    return unwrap(response);
+  },
+  async create(payload) {
+    const response = await api.post("/notes", payload);
+    return unwrap(response);
+  },
+  async update(id, payload) {
+    const response = await api.put(`/notes/${id}`, payload);
+    return unwrap(response);
+  },
+  async remove(id) {
+    const response = await api.delete(`/notes/${id}`);
+    return unwrap(response);
+  },
+};
+
 export const couponApi = {
   async list() {
     const response = await api.get("/coupons");
@@ -311,8 +455,16 @@ export const couponApi = {
     const response = await api.post("/coupons", payload);
     return unwrap(response);
   },
-  async validate(code) {
-    const response = await api.post("/coupons/validate", { code });
+  async update(id, payload) {
+    const response = await api.put(`/coupons/${id}`, payload);
+    return unwrap(response);
+  },
+  async remove(id) {
+    const response = await api.delete(`/coupons/${id}`);
+    return unwrap(response);
+  },
+  async validate(code, subtotal = 0) {
+    const response = await api.post("/coupons/validate", { code, subtotal });
     return unwrap(response);
   },
 };
@@ -352,5 +504,69 @@ export const dashboardApi = {
   async adminCourses(query = {}) {
     const response = await api.get("/admin/courses", { params: query });
     return unwrap(response);
+  },
+};
+
+export const platformApi = {
+  async stats() {
+    const response = await api.get("/platform/stats");
+    return unwrap(response);
+  },
+};
+
+export const playlistApi = {
+  async import(payload) {
+    const response = await api.post("/playlists/import", payload);
+    return unwrap(response);
+  },
+  async listMine(query = {}) {
+    const response = await api.get("/playlists/me", { params: query });
+    return unwrap(response);
+  },
+  async getById(id) {
+    const response = await api.get(`/playlists/${id}`);
+    return unwrap(response);
+  },
+  async watch(id) {
+    const response = await api.get(`/playlists/${id}/watch`);
+    return unwrap(response);
+  },
+  async updateProgress(id, payload) {
+    const response = await api.patch(`/playlists/${id}/progress`, payload);
+    return unwrap(response);
+  },
+  async refresh(id) {
+    const response = await api.post(`/playlists/${id}/refresh`);
+    return unwrap(response);
+  },
+};
+
+export const uploadApi = {
+  async uploadImage({ dataUrl, folder = "avatars", publicId }) {
+    const response = await api.post("/uploads/image", { dataUrl, folder, publicId });
+    return unwrap(response);
+  },
+  async uploadPublicImage({ dataUrl, publicId }) {
+    const response = await api.post("/uploads/public-image", { dataUrl, publicId }, { skipAuthRefresh: true });
+    return unwrap(response);
+  },
+  async requestLessonFileUpload({ fileName, contentType, folder }) {
+    const response = await api.post("/uploads/lesson-file", { fileName, contentType, folder });
+    return unwrap(response);
+  },
+  async uploadToPresignedUrl(uploadUrl, file, contentType) {
+    const response = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType || file.type || "application/octet-stream",
+      },
+      body: file,
+    });
+
+    if (!response.ok) {
+      throw new Error("S3 upload failed");
+    }
+
+    return true;
   },
 };

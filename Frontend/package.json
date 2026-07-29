@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "lint": "eslint src --ext .js,.jsx --ignore-pattern node_modules",
+    "format:check": "prettier --check src/utils/formatPrice.test.js src/test/setup.js vitest.config.js playwright.config.js e2e/smoke.spec.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -14,6 +19,7 @@
     "axios": "^1.7.7",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
+    "framer-motion": "^12.42.2",
     "lucide-react": "^0.453.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -26,9 +32,19 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.2",
+    "@playwright/test": "^1.52.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
     "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.3",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "jsdom": "^25.0.1",
+    "prettier": "^3.4.2",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
-    "vite": "^5.4.8"
+    "vite": "^5.4.8",
+    "vitest": "^2.1.8"
   }
 }

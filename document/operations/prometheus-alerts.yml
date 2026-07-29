@@ -1,0 +1,30 @@
+groups:
+  - name: coursify-api
+    rules:
+      - alert: CoursifyApiHighErrorRate
+        expr: |
+          (sum(rate(coursify_http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(coursify_http_requests_total[5m])), 1)) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Coursify API 5xx rate is above 1 percent
+
+      - alert: CoursifyApiHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(coursify_http_request_duration_seconds_bucket[5m])) by (le)) > 0.75
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Coursify API p95 latency is above 750 milliseconds
+
+      - alert: CoursifyApiDown
+        expr: up{job="coursify-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Coursify API is not being scraped

@@ -1,0 +1,121 @@
+COURSIFY - PILLAR 2 + PILLAR 3 SOURCE SUMMARY
+
+Source:
+- `Coursify_Pillar2_Pillar3_Execution.docx`
+- Extracted on 2026-07-14
+
+What this doc covers:
+- Pillar 2: Notes Marketplace
+- Pillar 3: YouTube Focus Mode
+- It also includes a Codex prompt section that explains what already exists, what to build, and what not to rebuild.
+
+PILLAR 2 - NOTES MARKETPLACE
+
+Core idea:
+- Any logged-in user can upload handwritten PDF notes, price them, and sell them.
+- Revenue split is 70% to the seller and 30% to the platform.
+- The same person can be both a buyer and a seller.
+- No special role is needed beyond being logged in.
+
+Primary seller flow:
+- Go to `/notes/sell`
+- Upload a PDF
+- The PDF goes to S3 through a presigned URL
+- A backend Lambda or worker processes the PDF automatically
+- It extracts page count
+- It generates a 2-page preview PDF with watermark
+- It creates a thumbnail from the cover page and uploads it to Cloudinary
+- Seller adds metadata
+- Seller submits the listing
+- Listing becomes available once validation and processing are complete
+- No per-note admin approval step is part of the flow
+
+Primary buyer flow:
+- Go to `/notes`
+- Filter by subject, price, rating, or linked course
+- Open a listing and view preview, rating, page count, seller info, and price
+- Buy through Lemon Squeezy checkout
+- Lemon Squeezy webhook confirms the payment
+- A `NotesPurchase` record is created
+- Seller wallet is credited with 70%
+- Buyer gets access to download
+- Download generates a buyer-specific watermarked PDF
+- Each purchase is limited to 5 downloads
+- Downloaded file is served through a signed CloudFront URL
+
+Seller payout flow:
+- Seller checks wallet at `/seller/wallet`
+- Withdrawal requires minimum balance
+- Withdrawal/payout handling needs to follow the final Lemon Squeezy money flow
+- If the seller has not completed payout setup, payout is blocked
+- After transfer, balance is reduced and history is stored
+
+Main collections:
+- `NotesList`
+- `NotesPurchase`
+- `SellerWallet`
+- `NotesReview`
+
+Main services:
+- `services/notes.js`
+- `services/wallet.js`
+
+Important business rules:
+- Only active notes appear publicly
+- Only verified buyers can review
+- Downloads require a purchase record
+- Downloads are capped at 5 per purchase
+- Original PDFs stay private in S3
+- Previews stay private and are short-lived
+- Lemon Squeezy webhook signatures must be verified
+- Sellers cannot self-assign payout flags
+
+PILLAR 3 - YOUTUBE FOCUS MODE
+
+Core idea:
+- A logged-in user pastes a public YouTube playlist URL.
+- The backend imports metadata from YouTube Data API v3.
+- The app stores only metadata and watch progress.
+- No video bytes are hosted by Coursify.
+- The player is distraction-free.
+
+Primary import flow:
+- Go to `/playlists/import`
+- Paste a YouTube playlist URL
+- Frontend sends the URL to the backend
+- Backend extracts playlist ID
+- Backend calls YouTube Data API v3
+- It fetches playlist items with pagination
+- It fetches durations with `videos.list`
+- It saves an `ImportedPlaylist`
+- It saves one `ImportedPlaylistVideo` per video
+- It returns the playlist for the watch page
+
+Primary watch flow:
+- User opens `/playlists/:id/watch`
+- Player fills the screen
+- Left side shows the embedded YouTube player
+- Right side shows ordered videos
+- Progress is saved while watching
+- Ended videos are marked watched automatically
+- The next video auto-opens
+- Returning to a partially watched video resumes from the last position
+
+Main collections:
+- `ImportedPlaylist`
+- `ImportedPlaylistVideo`
+
+Main services:
+- `services/playlist.js`
+
+Important business rules:
+- YouTube API calls stay on the backend
+- The frontend only uses the YouTube IFrame API
+- Duplicate imports are rejected
+- Private or deleted videos are skipped or flagged
+- Quota errors should return a clear user-facing failure
+- Refresh should update metadata without wiping progress
+
+Implementation note:
+- The doc also says to reuse the existing Pillar 1 stack:
+  Express routes/controllers/services/models, Mongoose, Zod validators, `requireAuth`, `requireRole`, `paginate`, and the existing S3 pattern.

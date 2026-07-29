@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { courseApi, courseApi as courseService, wishlistApi } from "@/services/api";
 
-export function useCourses(params) {
+export function useCourses(params, options = {}) {
   return useQuery({
     queryKey: ["courses", params],
+    enabled: options.enabled !== false,
     queryFn: () => courseService.list(params),
   });
 }
@@ -60,4 +61,12 @@ export function useAdminCourses(params = {}) {
 
 export function usePublicCourseList(params = {}) {
   return useCourses(params);
+}
+
+export function useTrendingCourses() {
+  return useCourses({ limit: 8 });
+}
+
+export function useFreeCourses() {
+  return useCourses({ limit: 8, maxPrice: 0 });
 }

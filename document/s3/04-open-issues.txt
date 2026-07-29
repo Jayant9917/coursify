@@ -1,0 +1,15 @@
+S3 OPEN ISSUES
+
+These still need to be resolved later:
+
+- Bucket permission is not available right now
+- Private bucket policy still needs to be finalized
+- Signed GET playback path needs final verification
+- UI polish for upload progress can be improved later
+- File size limits and production validation can be tightened later
+
+Because of the current bucket permission limitation:
+
+- S3 work is frozen for now
+- No more S3 implementation should be started until permission is available
+

@@ -1,0 +1,39 @@
+S3 IMPLEMENTED SO FAR
+
+Backend pieces:
+
+- `Backend/utils/s3.js`
+  - builds S3-related keys
+  - validates content types
+  - creates presigned URLs
+
+- `Backend/services/upload.js`
+  - adds lesson file upload request handling
+  - checks permissions for instructor/admin
+  - returns presigned upload data
+
+- `Backend/routes/uploads.js`
+  - adds `/api/uploads/lesson-file`
+
+- `Backend/validators/index.js`
+  - adds lesson upload validation
+
+- `Backend/models/index.js`
+  - lesson model now supports file reference fields
+
+- `Backend/services/index.js`
+  - lesson create/update flow carries the file reference field
+  - lesson access flow is being prepared in the service layer
+
+Frontend pieces:
+
+- `Frontend/src/pages/instructor/CourseEditor.jsx`
+  - upload UI was added for lesson video/PDF selection
+  - upload actions were wired into the editor flow
+
+- `Frontend/src/pages/student/LessonPlayer.jsx`
+  - lesson player was adjusted to support lesson file links
+
+- `Frontend/src/services/api.js`
+  - frontend can request lesson file upload URLs
+

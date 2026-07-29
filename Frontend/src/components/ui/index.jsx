@@ -5,10 +5,10 @@ export function Button({ className, variant = "default", size = "default", asChi
   const base =
     "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:pointer-events-none disabled:opacity-50";
   const variants = {
-    default: "bg-slate-900 text-white hover:bg-slate-700",
-    secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200",
-    ghost: "bg-transparent text-slate-900 hover:bg-slate-100",
-    outline: "border border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
+    default: "bg-[#171717] text-white hover:bg-lime-400 hover:text-black dark:bg-white dark:text-black dark:hover:bg-lime-300",
+    secondary: "bg-neutral-100 text-neutral-900 hover:bg-lime-200 dark:bg-neutral-800 dark:text-white dark:hover:bg-neutral-700",
+    ghost: "bg-transparent text-neutral-900 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800",
+    outline: "border border-neutral-200 bg-white text-neutral-900 hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white dark:hover:bg-neutral-800",
     destructive: "bg-red-600 text-white hover:bg-red-700",
   };
   const sizes = {
@@ -37,7 +37,7 @@ export const Input = React.forwardRef(function Input({ className, ...props }, re
     <input
       ref={ref}
       className={cn(
-        "flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white dark:ring-offset-neutral-900",
         className
       )}
       {...props}
@@ -51,7 +51,7 @@ export const Textarea = React.forwardRef(function Textarea({ className, ...props
     <textarea
       ref={ref}
       className={cn(
-        "flex min-h-[96px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-50",
+        "flex min-h-[96px] w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white dark:ring-offset-neutral-900",
         className
       )}
       {...props}
@@ -61,24 +61,24 @@ export const Textarea = React.forwardRef(function Textarea({ className, ...props
 Textarea.displayName = "Textarea";
 
 export function Label({ className, ...props }) {
-  return <label className={cn("text-sm font-medium text-slate-700", className)} {...props} />;
+  return <label className={cn("text-sm font-medium text-neutral-700 dark:text-neutral-300", className)} {...props} />;
 }
 
 export function Badge({ className, variant = "default", ...props }) {
   const variants = {
     default: "bg-slate-900 text-white",
-    secondary: "bg-slate-100 text-slate-800",
-    outline: "border border-slate-200 bg-white text-slate-700",
-    success: "bg-emerald-100 text-emerald-800",
-    warning: "bg-amber-100 text-amber-800",
-    danger: "bg-red-100 text-red-800",
-    info: "bg-sky-100 text-sky-800",
+    secondary: "bg-slate-100 text-slate-800 dark:bg-neutral-800 dark:text-neutral-200",
+    outline: "border border-slate-200 bg-white text-slate-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200",
+    success: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
+    warning: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+    danger: "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300",
+    info: "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300",
   };
   return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", variants[variant], className)} {...props} />;
 }
 
 export function Card({ className, ...props }) {
-  return <div className={cn("rounded-2xl border border-slate-200 bg-white shadow-sm", className)} {...props} />;
+  return <div className={cn("rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900", className)} {...props} />;
 }
 
 export function CardHeader({ className, ...props }) {
@@ -90,7 +90,7 @@ export function CardTitle({ className, ...props }) {
 }
 
 export function CardDescription({ className, ...props }) {
-  return <p className={cn("text-sm text-slate-500", className)} {...props} />;
+  return <p className={cn("text-sm text-neutral-500 dark:text-neutral-400", className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }) {
@@ -102,7 +102,7 @@ export function CardFooter({ className, ...props }) {
 }
 
 export function Avatar({ className, ...props }) {
-  return <div className={cn("relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200", className)} {...props} />;
+  return <div className={cn("relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-neutral-800", className)} {...props} />;
 }
 
 export function AvatarImage({ className, ...props }) {
@@ -112,26 +112,26 @@ export function AvatarImage({ className, ...props }) {
 export function AvatarFallback({ className, ...props }) {
   return (
     <div
-      className={cn("flex h-full w-full items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white", className)}
+      className={cn("flex h-full w-full items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white dark:bg-white dark:text-neutral-950", className)}
       {...props}
     />
   );
 }
 
 export function Skeleton({ className, ...props }) {
-  return <div className={cn("animate-pulse rounded-md bg-slate-200", className)} {...props} />;
+  return <div className={cn("animate-pulse rounded-md bg-slate-200 dark:bg-neutral-800", className)} {...props} />;
 }
 
 export function Progress({ value = 0, className, ...props }) {
   return (
-    <div className={cn("h-2 w-full overflow-hidden rounded-full bg-slate-100", className)} {...props}>
-      <div className="h-full rounded-full bg-slate-900 transition-all" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+    <div className={cn("h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-neutral-800", className)} {...props}>
+      <div className="h-full rounded-full bg-slate-900 transition-all dark:bg-lime-300" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
     </div>
   );
 }
 
 export function Separator({ className, ...props }) {
-  return <div className={cn("h-px w-full bg-slate-200", className)} {...props} />;
+  return <div className={cn("h-px w-full bg-slate-200 dark:bg-neutral-800", className)} {...props} />;
 }
 
 export const Select = React.forwardRef(function Select({ className, children, ...props }, ref) {
@@ -139,7 +139,7 @@ export const Select = React.forwardRef(function Select({ className, children, ..
     <select
       ref={ref}
       className={cn(
-        "flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400",
+        "flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white",
         className
       )}
       {...props}
@@ -163,11 +163,11 @@ export function TableBody({ className, ...props }) {
 }
 
 export function TableRow({ className, ...props }) {
-  return <tr className={cn("border-b transition-colors hover:bg-slate-50", className)} {...props} />;
+  return <tr className={cn("border-b transition-colors hover:bg-slate-50 dark:border-neutral-800 dark:hover:bg-neutral-900", className)} {...props} />;
 }
 
 export function TableHead({ className, ...props }) {
-  return <th className={cn("h-12 px-4 text-left align-middle font-medium text-slate-500", className)} {...props} />;
+  return <th className={cn("h-12 px-4 text-left align-middle font-medium text-slate-500 dark:text-neutral-400", className)} {...props} />;
 }
 
 export function TableCell({ className, ...props }) {
@@ -185,7 +185,7 @@ export function Tabs({ value, onValueChange, children, className }) {
 }
 
 export function TabsList({ className, children }) {
-  return <div className={cn("inline-flex h-10 items-center justify-center rounded-lg bg-slate-100 p-1 text-slate-500", className)}>{children}</div>;
+  return <div className={cn("inline-flex h-10 items-center justify-center rounded-lg bg-slate-100 p-1 text-slate-500 dark:bg-neutral-800 dark:text-neutral-400", className)}>{children}</div>;
 }
 
 export function TabsTrigger({ value, currentValue, onValueChange, className, children }) {
@@ -196,7 +196,7 @@ export function TabsTrigger({ value, currentValue, onValueChange, className, chi
       onClick={() => onValueChange?.(value)}
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all",
-        active ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900",
+        active ? "bg-white text-slate-900 shadow-sm dark:bg-neutral-950 dark:text-white" : "text-slate-500 hover:text-slate-900 dark:hover:text-white",
         className
       )}
     >

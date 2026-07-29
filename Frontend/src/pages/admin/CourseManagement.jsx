@@ -6,7 +6,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorState } from "@/components/common/ErrorState";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Pagination } from "@/components/common/Pagination";
-import { courseApi } from "@/services/api";
+import { courseApi, getApiErrorMessage } from "@/services/api";
 import { toast } from "sonner";
 import { formatPrice } from "@/utils/formatPrice";
 
@@ -25,7 +25,7 @@ export function CourseManagement() {
       toast.success(course.isPublished ? "Course unpublished" : "Course published");
       coursesQuery.refetch();
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Unable to update course");
+      toast.error(getApiErrorMessage(error));
     }
   };
 
@@ -35,7 +35,7 @@ export function CourseManagement() {
       toast.success("Course deleted");
       coursesQuery.refetch();
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Unable to delete course");
+      toast.error(getApiErrorMessage(error));
     }
   };
 

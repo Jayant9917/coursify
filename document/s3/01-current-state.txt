@@ -1,0 +1,24 @@
+S3 CURRENT STATE
+
+What S3 work is currently in the codebase:
+
+- Backend S3 helper exists
+- Backend upload route exists for lesson files
+- Backend validates lesson file types
+- Backend generates presigned upload URLs
+- Frontend course editor has S3 upload hooks wired for lesson media
+- Frontend lesson player has support for loading lesson PDFs from a stored file reference
+
+What the S3 work was intended to solve:
+
+- Private lesson videos
+- Private lesson PDFs
+- Direct browser upload to S3
+- Temporary access only when needed
+
+What is not finalized:
+
+- Bucket access policy
+- Final media access strategy
+- End-to-end production testing
+

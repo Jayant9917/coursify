@@ -9,6 +9,7 @@ const {
   sectionSchema,
   lessonSchema,
   reviewSchema,
+  lessonAccessSchema,
 } = require("../validators");
 
 const router = Router();
@@ -27,7 +28,13 @@ router.put("/lessons/:id", requireAuth, requireRole("instructor", "admin"), vali
 router.delete("/lessons/:id", requireAuth, requireRole("instructor", "admin"), lessonController.delete);
 
 router.get("/:id/progress", requireAuth, enrollmentController.courseProgress);
-router.post("/:id/reviews", requireAuth, requireRole("student", "instructor", "admin"), validate(reviewSchema), reviewController.create);
+router.get(
+  "/:id/lessons/:lessonId/access",
+  requireAuth,
+  validate(lessonAccessSchema, "params"),
+  courseController.lessonAccess
+);
+router.post("/:id/reviews", requireAuth, requireRole("student"), validate(reviewSchema), reviewController.create);
 router.get("/:id/reviews", reviewController.list);
 
 router.put("/:id", requireAuth, requireRole("instructor", "admin"), validate(courseUpdateSchema), courseController.update);

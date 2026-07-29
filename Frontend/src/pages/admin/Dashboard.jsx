@@ -23,8 +23,8 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <h1 className="text-3xl font-black text-slate-950">Admin dashboard</h1>
-        <p className="mt-2 text-slate-600">A quick look across users, courses, revenue, and orders.</p>
+        <h1 className="text-3xl font-black text-slate-950 dark:text-white">Admin dashboard</h1>
+        <p className="mt-2 text-slate-600 dark:text-neutral-400">A quick look across users, courses, revenue, and orders.</p>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -57,7 +57,7 @@ function Stat({ label, value }) {
   return (
     <Card className="p-6">
       <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
+      <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{value}</p>
     </Card>
   );
 }
@@ -73,11 +73,11 @@ function Panel({ title, children }) {
 
 function Row({ left, right, sub }) {
   return (
-    <div className="rounded-2xl border border-slate-200 p-4">
+    <div className="rounded-2xl border border-slate-200 p-4 dark:border-neutral-800">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="font-semibold text-slate-950">{left}</p>
-          <p className="text-sm text-slate-500">{sub}</p>
+          <p className="font-semibold text-slate-950 dark:text-white">{left}</p>
+          <p className="text-sm text-slate-500 dark:text-neutral-400">{sub}</p>
         </div>
         {right}
       </div>

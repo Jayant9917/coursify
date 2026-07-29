@@ -22,7 +22,7 @@ export function Dashboard() {
     <div className="space-y-6">
       <Card className="p-6">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Instructor dashboard</p>
-        <h1 className="mt-2 text-3xl font-black text-slate-950">Teach with clarity.</h1>
+        <h1 className="mt-2 text-3xl font-black text-slate-950 dark:text-white">Teach with clarity.</h1>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -44,14 +44,14 @@ export function Dashboard() {
             <EmptyState title="No courses yet" description="Create your first course to get started." />
           ) : (
             courses.map((course) => (
-              <div key={course._id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between">
+              <div key={course._id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4 dark:border-neutral-800 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-950">{course.title}</h3>
-                  <p className="text-sm text-slate-500">Updated {formatDate(course.updatedAt)}</p>
+                  <h3 className="font-semibold text-slate-950 dark:text-white">{course.title}</h3>
+                  <p className="text-sm text-slate-500 dark:text-neutral-400">Updated {formatDate(course.updatedAt)}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={course.isPublished ? "success" : "secondary"}>{course.isPublished ? "Published" : "Draft"}</Badge>
-                  <span className="text-sm text-slate-500">{formatPrice(course.discountPrice || course.price)}</span>
+                  <span className="text-sm text-slate-500 dark:text-neutral-400">{formatPrice(course.discountPrice || course.price)}</span>
                 </div>
               </div>
             ))
@@ -66,12 +66,12 @@ function Stat({ label, value, icon: Icon }) {
   return (
     <Card className="p-5">
       <div className="flex items-center gap-4">
-        <div className="grid h-11 w-11 place-items-center rounded-xl bg-slate-900 text-white">
+        <div className="grid h-11 w-11 place-items-center rounded-xl bg-slate-900 text-white dark:bg-white dark:text-neutral-950">
           <Icon className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-sm text-slate-500">{label}</p>
-          <p className="text-2xl font-bold text-slate-950">{value}</p>
+          <p className="text-sm text-slate-500 dark:text-neutral-400">{label}</p>
+          <p className="text-2xl font-bold text-slate-950 dark:text-white">{value}</p>
         </div>
       </div>
     </Card>

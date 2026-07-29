@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { couponApi, enrollmentApi, getApiErrorMessage, orderApi } from "@/services/api";
+import { couponApi, getApiErrorMessage, orderApi } from "@/services/api";
 import { normalizeId } from "@/utils/courseUtils";
 import { toast } from "sonner";
 
@@ -21,7 +20,6 @@ function extractDiscountAmount(payload) {
 }
 
 export function useCheckout(initialCourses = []) {
-  const navigate = useNavigate();
   const courses = useMemo(() => (Array.isArray(initialCourses) ? initialCourses.filter(Boolean) : []), [initialCourses]);
   const courseIds = useMemo(
     () => courses.map((course) => normalizeId(course?._id || course?.id || course?.courseId)).filter(Boolean),
@@ -41,24 +39,8 @@ export function useCheckout(initialCourses = []) {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [couponError, setCouponError] = useState("");
   const [orderError, setOrderError] = useState("");
-  const [placedOrder, setPlacedOrder] = useState(null);
 
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
-
-  const runEnrollments = async () => {
-    const results = await Promise.allSettled(courseIds.map((courseId) => enrollmentApi.enroll(courseId)));
-    const failures = results.filter((result) => result.status === "rejected").map((result) => result.reason);
-
-    if (failures.length > 0) {
-      const message = `Order was created, but ${failures.length} enrollment(s) failed.`;
-      console.error("Enrollment failures:", failures);
-      setOrderError(message);
-      toast.error(message);
-      return { ok: false, failures };
-    }
-
-    return { ok: true, failures: [] };
-  };
 
   const validateCoupon = async (code) => {
     const nextCode = String(code || "").trim();
@@ -73,7 +55,7 @@ export function useCheckout(initialCourses = []) {
     setCouponError("");
 
     try {
-      const payload = await couponApi.validate(nextCode);
+      const payload = await couponApi.validate(nextCode, subtotal);
       const amount = extractDiscountAmount(payload);
       setDiscountCode(nextCode);
       setDiscountAmount(amount);
@@ -113,47 +95,16 @@ export function useCheckout(initialCourses = []) {
       };
 
       const order = await orderApi.create(orderPayload);
-      setPlacedOrder(order);
-
-      const enrollmentResult = await runEnrollments();
-      if (!enrollmentResult.ok) {
+      if (!order?.checkoutUrl) {
+        const message = "Payment checkout could not be created.";
+        setOrderError(message);
+        toast.error(message);
         return null;
       }
 
-      toast.success("Order placed successfully!");
-      window.setTimeout(() => {
-        navigate("/student/dashboard", { replace: true });
-      }, 2000);
+      toast.success("Redirecting to secure checkout...");
+      window.location.assign(order.checkoutUrl);
       return order;
-    } catch (error) {
-      const message = getApiErrorMessage(error);
-      setOrderError(message);
-      toast.error(message);
-      return null;
-    } finally {
-      setIsPlacingOrder(false);
-    }
-  };
-
-  const retryEnrollments = async () => {
-    if (!placedOrder) {
-      return null;
-    }
-
-    setIsPlacingOrder(true);
-    setOrderError("");
-
-    try {
-      const enrollmentResult = await runEnrollments();
-      if (!enrollmentResult.ok) {
-        return null;
-      }
-
-      toast.success("Enrollments completed successfully!");
-      window.setTimeout(() => {
-        navigate("/student/dashboard", { replace: true });
-      }, 2000);
-      return enrollmentResult;
     } catch (error) {
       const message = getApiErrorMessage(error);
       setOrderError(message);
@@ -177,7 +128,5 @@ export function useCheckout(initialCourses = []) {
     removeCoupon,
     placeOrder,
     orderError,
-    hasPlacedOrder: Boolean(placedOrder),
-    retryEnrollments,
   };
 }

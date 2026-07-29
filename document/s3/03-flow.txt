@@ -1,0 +1,33 @@
+S3 FLOW INTENDED
+
+Upload flow:
+
+1. Instructor selects a video or PDF file.
+2. Frontend asks the backend for a presigned upload URL.
+3. Backend checks role and file type.
+4. Backend creates an S3 object key.
+5. Backend returns a presigned PUT URL.
+6. Frontend uploads the file directly to S3.
+7. Backend stores the object key in the lesson record.
+
+Playback flow:
+
+1. Student opens a lesson.
+2. Frontend asks backend for lesson access.
+3. Backend checks if the user can access the lesson.
+4. Backend generates a temporary signed GET URL.
+5. Frontend loads the file from that temporary URL.
+
+Important design rule:
+
+- Store the S3 object key in the database.
+- Do not store the temporary signed URL as the permanent lesson value.
+
+Good example:
+
+- `lesson-videos/12345-course-intro.mp4`
+
+Bad example:
+
+- `https://bucket.s3.amazonaws.com/...?...signature...`
+

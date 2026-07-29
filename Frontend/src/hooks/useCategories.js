@@ -23,3 +23,11 @@ export function useUpdateCategory() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["categories"] }),
   });
 }
+
+export function useDeleteCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => categoryApi.remove(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["categories"] }),
+  });
+}

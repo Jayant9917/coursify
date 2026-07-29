@@ -9,6 +9,9 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorState } from "@/components/common/ErrorState";
 import { EmptyState } from "@/components/common/EmptyState";
 import { findCourseById, getEnrollmentForCourse, groupLessonsBySection, normalizeId } from "@/utils/courseUtils";
+import { getPreviousRoute } from "@/utils/routeHistory";
+import { stripHtml } from "@/utils/sanitizeHtml";
+import { getApiErrorMessage } from "@/services/api";
 import { toast } from "sonner";
 
 export function LessonPlayer() {
@@ -32,6 +35,10 @@ export function LessonPlayer() {
   const lessonsBySection = useMemo(() => groupLessonsBySection(lessons), [lessons]);
   const completedIds = new Set((progressQuery.data || []).filter((record) => record.isCompleted).map((record) => normalizeId(record.lessonId)));
   const completionPercent = enrollment?.progressPercent || 0;
+  const goBack = () => {
+    const previousRoute = getPreviousRoute();
+    navigate(previousRoute || `/courses/${course?.slug || courseSummary?.slug || id}`);
+  };
 
   useEffect(() => {
     if (!currentLessonId && lessons.length > 0) {
@@ -60,23 +67,23 @@ export function LessonPlayer() {
       toast.success("Lesson marked as complete");
       progressQuery.refetch();
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Unable to update progress");
+      toast.error(getApiErrorMessage(error));
     }
   };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <Card className="h-fit border-slate-200 p-4 lg:sticky lg:top-24">
+      <Card className="h-fit border-slate-200 p-4 dark:border-neutral-800 lg:sticky lg:top-24">
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{course.level}</p>
-          <h1 className="text-lg font-bold text-slate-950">{course.title}</h1>
+          <h1 className="text-lg font-bold text-slate-950 dark:text-white">{course.title}</h1>
           <Progress value={completionPercent} />
-          <p className="text-xs text-slate-500">{completionPercent}% complete</p>
+          <p className="text-xs text-slate-500 dark:text-neutral-400">{completionPercent}% complete</p>
         </div>
         <div className="mt-5 space-y-4">
           {sections.map((section) => (
-            <details key={section._id} open className="rounded-2xl border border-slate-200 p-3">
-              <summary className="cursor-pointer list-none font-medium text-slate-900">{section.title}</summary>
+            <details key={section._id} open className="rounded-2xl border border-slate-200 p-3 dark:border-neutral-800">
+              <summary className="cursor-pointer list-none font-medium text-slate-900 dark:text-white">{section.title}</summary>
               <div className="mt-3 space-y-2">
                 {(lessonsBySection[section._id] || []).map((lesson) => {
                   const completed = completedIds.has(normalizeId(lesson._id));
@@ -106,7 +113,7 @@ export function LessonPlayer() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Lesson player</p>
-              <h2 className="mt-2 text-2xl font-black text-slate-950">{currentLesson?.title || "Select a lesson"}</h2>
+              <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{currentLesson?.title || "Select a lesson"}</h2>
             </div>
             <Badge variant="secondary">{completionPercent}%</Badge>
           </div>
@@ -118,10 +125,22 @@ export function LessonPlayer() {
             ) : currentLesson.type === "video" ? (
               <video controls className="w-full" src={currentLesson.videoUrl || currentLesson.content} />
             ) : currentLesson.type === "pdf" ? (
-              <iframe title={currentLesson.title} src={currentLesson.content || currentLesson.videoUrl} className="h-[520px] w-full bg-white" />
+              <div className="space-y-3 bg-white p-4">
+                <iframe title={currentLesson.title} src={currentLesson.fileUrl || currentLesson.content || currentLesson.videoUrl} className="h-[520px] w-full bg-white" />
+                {currentLesson.fileUrl ? (
+                  <a
+                    href={currentLesson.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+                  >
+                    Open PDF in new tab
+                  </a>
+                ) : null}
+              </div>
             ) : (
-              <div className="prose prose-invert max-w-none p-6">
-                <div dangerouslySetInnerHTML={{ __html: currentLesson.content || "<p>No content available.</p>" }} />
+              <div className="prose prose-invert max-w-none p-6 whitespace-pre-line">
+                <div>{stripHtml(currentLesson.content) || "No content available."}</div>
               </div>
             )}
           </div>
@@ -133,6 +152,9 @@ export function LessonPlayer() {
               </Button>
               <Button variant="outline" onClick={() => navigate(`/courses/${course.slug}`)}>
                 Back to course
+              </Button>
+              <Button variant="ghost" onClick={goBack}>
+                Back
               </Button>
             </div>
           ) : null}

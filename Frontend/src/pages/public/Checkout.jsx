@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, CheckCircle2, CreditCard, Loader2, RefreshCcw, ShieldCheck, ShoppingBag, Ticket, Trash2, User } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, Loader2, ShieldCheck, ShoppingBag, Ticket, Trash2, User } from "lucide-react";
 import { Badge, Button, Card, Input, Separator } from "@/components/ui";
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useCheckout } from "@/hooks/useCheckout";
+import { getPreviousRoute } from "@/utils/routeHistory";
 import { formatPrice } from "@/utils/formatPrice";
+import { brand } from "@/utils/brand";
 
 function getCoursePrice(course) {
   const discounted = Number(course?.discountPrice || 0);
@@ -37,12 +39,15 @@ export function Checkout() {
     removeCoupon,
     placeOrder,
     orderError,
-    hasPlacedOrder,
-    retryEnrollments,
   } = useCheckout(coursesFromState);
 
   const [couponInput, setCouponInput] = useState("");
   const [couponTouched, setCouponTouched] = useState(false);
+
+  const goBack = () => {
+    const previousRoute = getPreviousRoute();
+    navigate(previousRoute || "/courses");
+  };
 
   useEffect(() => {
     setCouponInput(discountCode || "");
@@ -63,15 +68,13 @@ export function Checkout() {
   };
 
   const showCourseList = courses.length > 0;
-  const showEnrollmentRetry = hasPlacedOrder && orderError?.toLowerCase().includes("enrollment");
-
   if (!location.state) {
     return (
       <div className="page-shell py-8">
-        <Link to="/courses" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900">
+        <button type="button" onClick={goBack} className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white">
           <ArrowLeft className="h-4 w-4" />
-          Back to courses
-        </Link>
+          Back
+        </button>
         <EmptyState
           title="No courses selected"
           description="Start from a course page or browse the catalog to add a course to checkout."
@@ -86,10 +89,10 @@ export function Checkout() {
   if (!showCourseList) {
     return (
       <div className="page-shell py-8">
-        <Link to="/courses" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900">
+        <button type="button" onClick={goBack} className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white">
           <ArrowLeft className="h-4 w-4" />
-          Back to courses
-        </Link>
+          Back
+        </button>
         <LoadingSpinner label="Preparing checkout..." />
       </div>
     );
@@ -98,13 +101,13 @@ export function Checkout() {
   return (
     <div className="page-shell py-8">
       <div className="mb-6 flex flex-col gap-3">
-        <Link to="/courses" className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900">
+        <button type="button" onClick={goBack} className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white">
           <ArrowLeft className="h-4 w-4" />
-          Continue shopping
-        </Link>
+          Back
+        </button>
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Checkout</p>
-          <h1 className="mt-2 text-3xl font-black text-slate-950">Review your order and complete purchase.</h1>
+          <h1 className="mt-2 text-3xl font-black text-slate-950 dark:text-white">Review your order and complete purchase.</h1>
         </div>
       </div>
 
@@ -136,10 +139,10 @@ export function Checkout() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <h3 className="text-lg font-semibold text-slate-950">{course.title}</h3>
-                          <p className="mt-1 flex items-center gap-2 text-sm text-slate-500">
+                          <h3 className="text-lg font-semibold text-slate-950 dark:text-white">{course.title}</h3>
+                          <p className="mt-1 flex items-center gap-2 text-sm text-slate-500 dark:text-neutral-400">
                             <User className="h-4 w-4" />
-                            {course.instructor?.name || course.instructorName || "Coursify Instructor"}
+                            {course.instructor?.name || course.instructorName || brand.instructorLabel}
                           </p>
                         </div>
                         <Badge variant="outline">Included</Badge>
@@ -147,14 +150,14 @@ export function Checkout() {
                       <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
                         {hasSale ? (
                           <>
-                            <span className="font-semibold text-slate-950">{formatPrice(salePrice)}</span>
+                            <span className="font-semibold text-slate-950 dark:text-white">{formatPrice(salePrice)}</span>
                             <span className="text-slate-400 line-through">{formatPrice(course.price)}</span>
                           </>
                         ) : (
-                          <span className="font-semibold text-slate-950">{formatPrice(salePrice)}</span>
+                          <span className="font-semibold text-slate-950 dark:text-white">{formatPrice(salePrice)}</span>
                         )}
                       </div>
-                      <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+                      <div className="mt-3 flex items-center gap-2 text-sm text-slate-500 dark:text-neutral-400">
                         <BookOpen className="h-4 w-4" />
                         {course.level || "All levels"}
                       </div>
@@ -168,7 +171,7 @@ export function Checkout() {
           <Card className="border-slate-200 p-6">
             <div className="flex items-center gap-2">
               <ShoppingBag className="h-5 w-5 text-slate-500" />
-              <h2 className="text-xl font-bold text-slate-950">Pricing</h2>
+              <h2 className="text-xl font-bold text-slate-950 dark:text-white">Pricing</h2>
             </div>
             <div className="mt-5 space-y-3 text-sm">
               <Row label="Subtotal" value={formatPrice(subtotal)} />
@@ -178,7 +181,7 @@ export function Checkout() {
                 valueClassName={discountAmount > 0 ? "text-emerald-700" : "text-slate-400"}
               />
               <Separator className="my-4" />
-              <Row label="Total" value={formatPrice(total)} valueClassName="text-lg font-bold text-slate-950" />
+              <Row label="Total" value={formatPrice(total)} valueClassName="text-lg font-bold text-slate-950 dark:text-white" />
             </div>
           </Card>
         </section>
@@ -187,7 +190,7 @@ export function Checkout() {
           <Card className="border-slate-200 p-6">
             <div className="flex items-center gap-2">
               <Ticket className="h-5 w-5 text-slate-500" />
-              <h2 className="text-xl font-bold text-slate-950">Coupon code</h2>
+              <h2 className="text-xl font-bold text-slate-950 dark:text-white">Coupon code</h2>
             </div>
 
             <div className="mt-5 space-y-3">
@@ -243,12 +246,12 @@ export function Checkout() {
 
           <Card className="border-slate-200 p-6">
             <div className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-slate-500" />
-              <h2 className="text-xl font-bold text-slate-950">Place order</h2>
+              <ShoppingBag className="h-5 w-5 text-slate-500" />
+              <h2 className="text-xl font-bold text-slate-950 dark:text-white">Proceed to payment</h2>
             </div>
 
             <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <p>You will be automatically enrolled in all courses after payment is confirmed.</p>
+              <p>You will be redirected to Lemon Squeezy to complete payment securely.</p>
               {orderError ? <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">{orderError}</p> : null}
             </div>
 
@@ -261,26 +264,19 @@ export function Checkout() {
                 {isPlacingOrder ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Processing...
+                    Creating checkout...
                   </>
                 ) : (
                   <>
-                    <CreditCard className="h-4 w-4" />
-                    Place Order
+                    <ShoppingBag className="h-4 w-4" />
+                    Continue to payment
                   </>
                 )}
               </Button>
-
-              {showEnrollmentRetry ? (
-                <Button className="w-full" variant="outline" onClick={retryEnrollments} disabled={isPlacingOrder}>
-                  <RefreshCcw className="h-4 w-4" />
-                  Retry enrollments
-                </Button>
-              ) : null}
             </div>
 
             <p className="mt-4 text-xs leading-5 text-slate-500">
-              By placing this order, your selected courses will be added to your account and appear in your student dashboard.
+              Once payment is confirmed, the order will be marked as paid and your courses will appear in your student dashboard.
             </p>
           </Card>
         </aside>
@@ -289,7 +285,7 @@ export function Checkout() {
   );
 }
 
-function Row({ label, value, valueClassName = "text-slate-950" }) {
+function Row({ label, value, valueClassName = "text-slate-950 dark:text-white" }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="text-slate-500">{label}</span>

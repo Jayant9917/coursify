@@ -3,8 +3,6 @@ import { AlertTriangle, RefreshCcw } from "lucide-react";
 import { Button, Card } from "@/components/ui";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 
-const isDev = import.meta.env.DEV;
-
 export class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -33,7 +31,7 @@ export class ErrorBoundary extends React.Component {
   }
 
   render() {
-    const { hasError, error, errorInfo, ready } = this.state;
+    const { hasError, ready } = this.state;
 
     if (!ready) {
       return <LoadingSpinner label="Loading application..." />;
@@ -57,15 +55,6 @@ export class ErrorBoundary extends React.Component {
               </Button>
             </div>
 
-            {isDev ? (
-              <details className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
-                <summary className="cursor-pointer text-sm font-semibold text-slate-700">Debug details</summary>
-                <pre className="mt-3 overflow-auto whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">
-                  {error?.stack || error?.message || String(error)}
-                  {errorInfo?.componentStack ? `\n\n${errorInfo.componentStack}` : ""}
-                </pre>
-              </details>
-            ) : null}
           </Card>
         </div>
       );

@@ -1,0 +1,37 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./Backend
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      MONGODB_URL: ${MONGODB_URL:?Set MONGODB_URL}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS}
+      REDIS_URL: redis://redis:6379
+      QUEUE_ENABLED: "true"
+      METRICS_ENABLED: "true"
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      TRUST_PROXY: "true"
+    depends_on:
+      - redis
+    ports:
+      - "3002:3002"
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+volumes:
+  redis-data:

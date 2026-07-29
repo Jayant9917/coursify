@@ -30,11 +30,12 @@ export function isCourseInWishlist(wishlist = [], courseId) {
 
 export function isEnrollmentForCourse(enrollments = [], courseId) {
   const target = normalizeId(courseId);
-  return enrollments.some((item) => normalizeId(item.courseId) === target);
+  return enrollments.some(
+    (item) => normalizeId(item.courseId) === target && ["active", "completed"].includes(item.status || "active")
+  );
 }
 
 export function getEnrollmentForCourse(enrollments = [], courseId) {
   const target = normalizeId(courseId);
   return enrollments.find((item) => normalizeId(item.courseId) === target);
 }
-

@@ -10,3 +10,7 @@ Backend/.env
 Frontend/node_modules/
 Frontend/dist/
 Frontend/.vite/
+Frontend/test-results/
+Frontend/playwright-report/
+Frontend/coverage/
+Backend/coverage/

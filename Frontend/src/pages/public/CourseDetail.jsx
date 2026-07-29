@@ -25,8 +25,12 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { StarRating } from "@/components/common/StarRating";
 import { formatPrice } from "@/utils/formatPrice";
 import { groupLessonsBySection, isCourseInWishlist, isEnrollmentForCourse, normalizeId } from "@/utils/courseUtils";
+import { getCourseArtwork } from "@/utils/courseArtwork";
+import { stripHtml } from "@/utils/sanitizeHtml";
+import { getApiErrorMessage } from "@/services/api";
 import { toast } from "sonner";
 import { courseApi } from "@/services/api";
+import { brand } from "@/utils/brand";
 
 const reviewSchema = z.object({
   rating: z.coerce.number().min(1).max(5),
@@ -82,7 +86,7 @@ export function CourseDetail() {
       await toggleWishlist.mutateAsync({ courseId, liked });
       toast.success(liked ? "Removed from wishlist" : "Added to wishlist");
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Unable to update wishlist");
+      toast.error(getApiErrorMessage(error));
     }
   };
 
@@ -92,8 +96,8 @@ export function CourseDetail() {
       toast.success("Review submitted");
       reviewForm.reset();
       reviewsQuery.refetch();
-    } catch {
-      toast.error("Unable to submit review");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
     }
   });
 
@@ -102,14 +106,14 @@ export function CourseDetail() {
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-5">
           <Badge variant="secondary">{course.level}</Badge>
-          <h1 className="text-3xl font-black text-slate-950 sm:text-4xl">{course.title}</h1>
-          <p className="max-w-3xl text-base leading-7 text-slate-600">{course.shortDescription || course.description}</p>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+          <h1 className="text-3xl font-black text-slate-950 dark:text-white sm:text-4xl">{course.title}</h1>
+          <p className="max-w-3xl text-base leading-7 text-slate-600 dark:text-neutral-400">{course.shortDescription || course.description}</p>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 dark:text-neutral-400">
             <span className="flex items-center gap-2">
               <StarRating value={course.ratingAvg || 0} />
               {Number(course.ratingAvg || 0).toFixed(1)} ({course.ratingCount || 0})
             </span>
-            <span>{course.instructor?.name || course.instructorName || "Coursify Instructor"}</span>
+            <span>{course.instructor?.name || course.instructorName || brand.instructorLabel}</span>
             <span>{course.enrollmentCount || 0} enrolled</span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -128,25 +132,25 @@ export function CourseDetail() {
               <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />
               {liked ? "Saved" : "Wishlist"}
             </Button>
-            <div className="text-2xl font-bold text-slate-950">{formatPrice(course.discountPrice || course.price)}</div>
+            <div className="text-2xl font-bold text-slate-950 dark:text-white">{formatPrice(course.discountPrice || course.price)}</div>
           </div>
         </div>
 
         <Card className="overflow-hidden border-slate-200">
           <img
-            src={course.thumbnailUrl || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='540' viewBox='0 0 900 540'%3E%3Crect width='900' height='540' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='32' fill='%2394a3b8'%3ECoursify Course%3C/text%3E%3C/svg%3E"}
+            src={course.thumbnailUrl || getCourseArtwork(course, "hero")}
             alt={course.title}
             className="h-72 w-full object-cover"
           />
           <div className="space-y-3 p-5">
-            <div className="flex items-center justify-between text-sm text-slate-600">
+            <div className="flex items-center justify-between text-sm text-slate-600 dark:text-neutral-400">
               <span className="flex items-center gap-2">
                 <CirclePlay className="h-4 w-4" />
                 Preview available
               </span>
               <span>{sections.length} sections</span>
             </div>
-            <p className="text-sm text-slate-500">Includes {lessons.length} lessons with videos, notes, and downloadable PDFs.</p>
+            <p className="text-sm text-slate-500 dark:text-neutral-400">Includes {lessons.length} lessons with videos, notes, and downloadable PDFs.</p>
           </div>
         </Card>
       </div>
@@ -169,14 +173,13 @@ export function CourseDetail() {
             <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
               <Card className="p-6">
                 <h2 className="text-xl font-bold">What you will learn</h2>
-                <div
-                  className="prose prose-slate mt-4 max-w-none"
-                  dangerouslySetInnerHTML={{ __html: course.description }}
-                />
+                <div className="prose prose-slate mt-4 max-w-none whitespace-pre-line text-slate-700 dark:prose-invert dark:text-neutral-300">
+                  {stripHtml(course.description) || "Course details will appear here soon."}
+                </div>
               </Card>
               <Card className="p-6">
                 <h3 className="font-semibold">Course facts</h3>
-                <div className="mt-4 space-y-3 text-sm text-slate-600">
+                <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-neutral-400">
                   <Fact label="Level" value={course.level} />
                   <Fact label="Price" value={formatPrice(course.discountPrice || course.price)} />
                   <Fact label="Lessons" value={String(lessons.length)} />
@@ -196,11 +199,11 @@ export function CourseDetail() {
                 />
               ) : (
                 sections.map((section) => (
-                  <details key={section._id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" open>
+                  <details key={section._id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900" open>
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
                       <div>
-                        <h3 className="font-semibold text-slate-950">{section.title}</h3>
-                        <p className="text-sm text-slate-500">{lessonsBySection[section._id]?.length || 0} lessons</p>
+                        <h3 className="font-semibold text-slate-950 dark:text-white">{section.title}</h3>
+                        <p className="text-sm text-slate-500 dark:text-neutral-400">{lessonsBySection[section._id]?.length || 0} lessons</p>
                       </div>
                       <BookOpen className="h-5 w-5 text-slate-500" />
                     </summary>
@@ -215,8 +218,8 @@ export function CourseDetail() {
                             <div className="flex items-center gap-3">
                               {lesson.type === "video" ? <Video className="h-4 w-4" /> : lesson.type === "pdf" ? <FileText className="h-4 w-4" /> : <MessageSquareMore className="h-4 w-4" />}
                               <div>
-                                <p className="font-medium text-slate-900">{lesson.title}</p>
-                                <p className="text-slate-500">{lesson.duration || 0} min</p>
+                                <p className="font-medium text-slate-900 dark:text-white">{lesson.title}</p>
+                                <p className="text-slate-500 dark:text-neutral-400">{lesson.duration || 0} min</p>
                               </div>
                             </div>
                             {locked ? <Lock className="h-4 w-4 text-slate-400" /> : <Check className="h-4 w-4 text-emerald-600" />}
@@ -249,12 +252,12 @@ export function CourseDetail() {
                       <div key={review._id} className="rounded-2xl border border-slate-200 p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="font-semibold text-slate-950">{review.title || "Review"}</p>
-                            <p className="text-sm text-slate-500">{review.isVerifiedPurchase ? "Verified enrollment" : "Review"}</p>
+                            <p className="font-semibold text-slate-950 dark:text-white">{review.title || "Review"}</p>
+                            <p className="text-sm text-slate-500 dark:text-neutral-400">{review.isVerifiedPurchase ? "Verified enrollment" : "Review"}</p>
                           </div>
                           <StarRating value={review.rating} />
                         </div>
-                        <p className="mt-3 text-sm leading-6 text-slate-600">{review.comment || "No comment provided."}</p>
+                        <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-neutral-400">{review.comment || "No comment provided."}</p>
                       </div>
                     ))
                   )}
@@ -295,7 +298,7 @@ function Fact({ label, value }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-900">{value}</span>
+      <span className="font-medium text-slate-900 dark:text-white">{value}</span>
     </div>
   );
 }

@@ -85,13 +85,15 @@ Allowed public roles:
 - `student`
 - `instructor`
 
+Request body may contain either `courseIds` or `noteIds`, but not both.
+
 Business logic:
 
 - validates the payload with Zod
 - prevents duplicate email registration
 - hashes password with bcrypt
 - creates access and refresh tokens
-- stores refresh token in the in-memory token store
+- stores refresh token in MongoDB for persistent refresh sessions
 
 Request body:
 
@@ -122,6 +124,45 @@ Request body:
 {
   "email": "aman@example.com",
   "password": "StrongPassword123!"
+}
+```
+
+### POST `/api/auth/forgot-password`
+
+Starts the password recovery flow.
+
+Business logic:
+
+- looks up the user by email
+- generates a one-time reset token
+- stores only the token hash in MongoDB with a TTL
+- in non-production, returns the raw reset token so the flow can be tested without email delivery
+
+Request body:
+
+```json
+{
+  "email": "aman@example.com"
+}
+```
+
+### POST `/api/auth/reset-password`
+
+Resets the password using a valid reset token.
+
+Business logic:
+
+- validates the reset token
+- checks token expiry and reuse
+- hashes the new password
+- clears the user’s existing refresh tokens
+
+Request body:
+
+```json
+{
+  "token": "reset-token-from-email-or-dev-response",
+  "password": "NewStrongPassword123!"
 }
 ```
 
@@ -223,6 +264,69 @@ Request body:
 }
 ```
 
+## Uploads API
+
+### POST `/api/uploads/image`
+
+Uploads an image to Cloudinary and returns the hosted URL.
+
+Role:
+
+- any authenticated user
+
+Business logic:
+
+- accepts a base64 image data URL
+- uploads the image to Cloudinary
+- returns the hosted URL and metadata
+- does not store binary file data in MongoDB
+
+Request body:
+
+```json
+{
+  "dataUrl": "data:image/png;base64,...",
+  "folder": "avatars",
+  "publicId": "avatar-123"
+}
+```
+
+Allowed folders:
+
+- `avatars`
+- `courseThumbnails`
+
+### POST `/api/uploads/lesson-file`
+
+Creates a presigned S3 upload URL for a PDF or video file.
+
+Role:
+
+- `instructor`
+- `admin`
+
+Business logic:
+
+- validates that the file type matches the target folder
+- creates a presigned PUT URL for S3
+- returns the final file URL that should be stored in MongoDB after upload
+- does not store the file binary in MongoDB
+
+Request body:
+
+```json
+{
+  "fileName": "lesson-1.mp4",
+  "contentType": "video/mp4",
+  "folder": "lessonVideos"
+}
+```
+
+Allowed folders:
+
+- `lessonVideos`
+- `lessonPdfs`
+
 ## Courses API
 
 ### GET `/api/courses`
@@ -239,10 +343,12 @@ Query params:
 - `minPrice`
 - `maxPrice`
 - `search`
+- `isFeatured`
 
 Business logic:
 
 - filters only published courses
+- supports featured-course filtering
 - supports pagination and search
 
 ### GET `/api/courses/:slug`
@@ -413,6 +519,7 @@ Request body:
   "type": "video",
   "content": "",
   "videoUrl": "",
+  "fileUrl": "",
   "duration": 120,
   "isPreview": true,
   "order": 1
@@ -510,7 +617,7 @@ Role:
 
 ### POST `/api/orders`
 
-Creates a new order in pending state.
+Creates a new order in pending state and returns a Lemon Squeezy checkout URL.
 
 Role:
 
@@ -518,23 +625,161 @@ Role:
 
 Business logic:
 
-- validates the course list
+- validates the course or Study Vault note list
 - calculates subtotal using discount price if available
-- applies coupon if provided
+- validates the coupon if provided
+- applies the computed coupon discount if valid
+- reserves a coupon slot while the order is pending
 - creates order and order items
-- leaves order in `pending` status
+- creates a Lemon Squeezy checkout session
+- stores the checkout reference on the order
+- leaves order in `pending` status until the Lemon Squeezy `order_created` webhook confirms a paid order
+- converts the pending coupon reservation into `redeemedCount` only after payment confirmation
+- releases the reservation when checkout creation fails or the pending reservation expires
+- allows each authenticated student account to redeem a coupon code only once
+- wraps local order, order-item, and coupon reservation writes in a MongoDB transaction
 
 Request body:
 
 ```json
 {
   "courseIds": ["665f...", "665f..."],
-  "currency": "INR",
-  "paymentProvider": "manual",
-  "paymentIntentId": "",
   "couponCode": "WELCOME10"
 }
 ```
+
+Paid Study Vault example:
+
+```json
+{
+  "noteIds": ["665f..."]
+}
+```
+
+Response:
+
+```json
+{
+  "_id": "66ab...",
+  "status": "pending",
+  "paymentProvider": "lemon_squeezy",
+  "paymentIntentId": "checkout_123",
+  "checkoutUrl": "https://checkout.lemonsqueezy.com/..."
+}
+```
+
+### POST `/api/orders/webhook/lemon-squeezy`
+
+Public webhook endpoint used by Lemon Squeezy to confirm payment.
+
+Business logic:
+
+- verifies the `X-Signature` header against the raw request body
+- finds the matching order from webhook custom data
+- accepts the `order_created` event only when the provider status is `paid`
+- reconciles the provider store, product or variant, currency, provider order ID, and paid amount before accepting payment
+- marks the order as `paid`
+- finalizes the coupon redemption reservation, if present
+- enrolls the student into all purchased courses
+- is idempotent on repeated webhook deliveries and reconciles missing enrollments
+- commits order status, coupon redemption, and enrollment changes in one MongoDB transaction
+- completes `NotePurchase` records for paid Study Vault orders and preserves the provider order ID
+- revokes course enrollments and note access when an `order_refunded` event is received
+
+Webhook diagnostics are logged server-side without logging the signature or full
+payload. Each webhook log includes `eventName`, `orderId`, `providerStatus`, and
+`webhookResponseStatus`.
+
+All API requests also receive an `X-Request-Id` response header. The backend
+console prints matching structured records for `api.request`, `api.response`,
+and `api.error`, including method, URL, route, status, duration, user role,
+sanitized query/params/body, and the real server error stack when available.
+Passwords, tokens, cookies, signatures, raw bodies, and image data URLs are
+automatically redacted.
+
+Example error log shape:
+
+```json
+{
+  "event": "api.error",
+  "requestId": "request-id-from-response-header",
+  "method": "PUT",
+  "url": "/api/users/me",
+  "statusCode": 400,
+  "response": { "message": "Password must be at least 8 characters." },
+  "error": {
+    "name": "ApiError",
+    "message": "Validation failed",
+    "details": [{ "path": ["password"], "code": "too_small" }]
+  }
+}
+```
+
+Webhook response meanings:
+
+- `200`: webhook accepted, skipped, or already processed
+- `400`: missing order metadata, missing signature, or invalid payload
+- `401`: webhook secret/signature mismatch
+- `404`: the referenced local order does not exist
+- `500`: an unexpected backend or database error; the client receives a safe generic message
+
+The shared error handler also converts validation, authentication, authorization,
+rate-limit, provider, and unknown server errors into readable API messages. Raw
+database errors, stack traces, provider payloads, and secrets are kept in server
+logs only.
+
+### GET `/api/orders/webhook-monitoring`
+
+Returns recent Lemon Squeezy webhook delivery records for troubleshooting.
+
+Role:
+
+- `admin`
+
+Optional query:
+
+- `limit`: number of records to return, capped at 200
+
+Each record includes the event name, provider and local order IDs when available,
+delivery status, attempt count, response status, timestamps, and a safe error
+summary. Signature values and full provider payloads are never stored.
+
+The backend also runs a maintenance worker after MongoDB connects. It checks for
+expired pending coupon reservations on a configurable interval and releases them
+so reserved coupon capacity becomes available again. Configure the interval with
+`COUPON_CLEANUP_INTERVAL_MS` (default: 60000 milliseconds).
+
+## Notes Marketplace API
+
+### GET `/api/notes`
+
+Lists published PDF notes. Supports optional `search`, `subject`, and `limit` query parameters.
+
+### GET `/api/notes/:slug`
+
+Returns public metadata for one published note. The storage key is never included in this response.
+
+### POST `/api/notes`
+
+Creates a note for an instructor or admin. The PDF must already be uploaded through
+`POST /api/uploads/lesson-file` with `folder: "notes"`; only keys beginning with
+`notes/` are accepted.
+
+### POST `/api/notes/:id/purchase`
+
+Creates a completed purchase record for a published free note. Paid notes use
+`POST /api/orders` with `noteIds`, then complete through the signed Lemon Squeezy webhook.
+This endpoint continues to reject paid notes so paid access cannot bypass checkout.
+
+### GET `/api/notes/:id/download`
+
+Returns a short-lived S3 download URL only when the authenticated student owns the
+note, or when the requester is the note seller/admin. Download counters are updated
+server-side.
+
+### GET `/api/notes/purchases/me`
+
+Returns the authenticated student’s completed note purchases.
 
 ### GET `/api/orders/me`
 
@@ -681,12 +926,30 @@ Business logic:
 - checks active flag
 - checks expiry
 - checks redemption limit
+- returns the computed discount amount for the provided subtotal
 
 Request body:
 
 ```json
 {
-  "code": "WELCOME10"
+  "code": "WELCOME10",
+  "subtotal": 4999
+}
+```
+
+Response:
+
+```json
+{
+  "coupon": {
+    "_id": "665f...",
+    "code": "WELCOME10",
+    "type": "percent",
+    "value": 10
+  },
+  "subtotal": 4999,
+  "discountAmount": 500,
+  "total": 4499
 }
 ```
 
@@ -781,6 +1044,8 @@ The backend currently uses these collections:
 - `courseprogress`
 - `coupons`
 - `notifications`
+- `refreshtokens`
+- `passwordresettokens`
 
 ## Environment Variables
 
@@ -792,10 +1057,27 @@ JWT_ACCESS_SECRET=your-long-secret
 JWT_REFRESH_SECRET=your-long-secret
 PORT=3002
 CORS_ORIGINS=http://localhost:5500,http://127.0.0.1:5500
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+AWS_REGION=ap-south-1
+AWS_S3_BUCKET=your-coursify-bucket
+FRONTEND_URL=http://localhost:5173
+LEMONSQUEEZY_API_KEY=your_lemonsqueezy_api_key
+LEMONSQUEEZY_STORE_ID=your_store_id
+LEMONSQUEEZY_PRODUCT_ID=your_product_id
+LEMONSQUEEZY_VARIANT_ID=your_variant_id
+LEMONSQUEEZY_WEBHOOK_SECRET=your_webhook_secret
+LEMONSQUEEZY_AMOUNT_TOLERANCE_MINOR=100
 ```
 
 ## Notes
 
-- Refresh tokens are currently stored in memory.
+- Payment transactions require MongoDB replica-set support. MongoDB Atlas provides this by default; local MongoDB must be started as a single-node replica set.
+- Refresh tokens are stored in MongoDB and rotated on refresh.
+- Image uploads now go through Cloudinary.
+- Lesson PDFs and videos use presigned S3 uploads.
 - The backend is designed to be extended into a more complete LMS with payments, media upload, and analytics later.
 - Legacy MVP route files exist in `Backend/routers`, but they are not used by the current app bootstrap.
