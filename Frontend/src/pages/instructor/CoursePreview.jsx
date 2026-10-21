@@ -10,10 +10,13 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { getApiErrorMessage } from "@/services/api";
 import { toast } from "sonner";
 import { stripHtml } from "@/utils/sanitizeHtml";
+import { useAuth } from "@/hooks/useAuth";
 
 export function CoursePreview() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const basePath = user?.role === "admin" ? "/creator" : "/instructor";
   const [currentLessonId, setCurrentLessonId] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [mediaState, setMediaState] = useState("idle");
@@ -54,11 +57,11 @@ export function CoursePreview() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="ghost" onClick={() => navigate("/instructor/courses")}><ArrowLeft className="h-4 w-4" />Back to courses</Button>
+        <Button variant="ghost" onClick={() => navigate(`${basePath}/courses`)}><ArrowLeft className="h-4 w-4" />Back to courses</Button>
         <div className="flex items-center gap-2">
           <Badge variant={course.isPublished ? "success" : "secondary"}>{course.isPublished ? "Published" : "Draft preview"}</Badge>
           <Badge variant="outline">{course.discountPrice || course.price ? `₹${course.discountPrice || course.price}` : "Free"}</Badge>
-          <Button asChild variant="outline"><Link to={`/instructor/courses/${course._id}/edit`}>Edit course</Link></Button>
+          <Button asChild variant="outline"><Link to={`${basePath}/courses/${course._id}/edit`}>Edit course</Link></Button>
         </div>
       </div>
 
@@ -96,7 +99,7 @@ export function CoursePreview() {
               {currentLesson.type === "video" ? mediaUrl ? <video controls preload="metadata" className="aspect-video w-full" src={mediaUrl} onLoadStart={() => setMediaState("loading")} onCanPlay={() => setMediaState("ready")} onError={() => setMediaState("error")} /> : <div className="grid aspect-video place-items-center text-white"><p>{mediaState === "error" ? "Video could not be loaded." : "Loading video…"}</p></div> : currentLesson.type === "pdf" ? mediaUrl ? <iframe title={currentLesson.title} src={mediaUrl} className="h-[520px] w-full bg-white" /> : <div className="grid min-h-[420px] place-items-center bg-white text-slate-600"><p>{mediaState === "error" ? "PDF could not be loaded." : "Loading PDF…"}</p></div> : <div className="prose prose-invert max-w-none p-6 whitespace-pre-line"><div>{stripHtml(currentLesson.content) || "No lesson content available."}</div></div>}
             </div>
             <div className="mt-4 flex items-center gap-2 text-sm">{currentLesson.type === "video" && mediaState === "ready" ? <><CheckCircle2 className="h-4 w-4 text-emerald-500" /><span className="text-emerald-700">Video playback check passed.</span></> : currentLesson.type === "video" && mediaState === "error" ? <><CircleAlert className="h-4 w-4 text-red-500" /><span className="text-red-700">Video playback check failed.</span></> : <span className="text-slate-500">Play the lesson to verify it before publishing.</span>}</div>
-            <div className="mt-5 flex flex-wrap gap-3"><Button onClick={() => setMediaState("loading")}><Play className="h-4 w-4" />Test lesson</Button><Button variant="outline" asChild><Link to={`/instructor/courses/${course._id}/edit`}>Replace media</Link></Button></div>
+            <div className="mt-5 flex flex-wrap gap-3"><Button onClick={() => setMediaState("loading")}><Play className="h-4 w-4" />Test lesson</Button><Button variant="outline" asChild><Link to={`${basePath}/courses/${course._id}/edit`}>Replace media</Link></Button></div>
           </>}
         </Card>
       </div>

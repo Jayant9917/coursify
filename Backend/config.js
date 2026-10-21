@@ -60,6 +60,10 @@ if (!["s3", "local"].includes(config.mediaStorageProvider)) {
   throw new Error("MEDIA_STORAGE_PROVIDER must be either s3 or local");
 }
 
+if (process.env.NODE_ENV === "production" && config.mediaStorageProvider !== "s3") {
+  throw new Error("MEDIA_STORAGE_PROVIDER=s3 is required in production");
+}
+
 if (!["resend", "console"].includes(config.emailProvider)) {
   throw new Error("EMAIL_PROVIDER must be either resend or console");
 }

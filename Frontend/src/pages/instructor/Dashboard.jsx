@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { BookOpen, DollarSign, GraduationCap, Star } from "lucide-react";
 import { useInstructorStats, useInstructorDashboardCourses } from "@/hooks/useDashboard";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, Button, Badge } from "@/components/ui";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorState } from "@/components/common/ErrorState";
@@ -11,6 +12,8 @@ import { formatDate } from "@/utils/formatDate";
 export function Dashboard() {
   const statsQuery = useInstructorStats();
   const coursesQuery = useInstructorDashboardCourses({ limit: 5 });
+  const { user } = useAuth();
+  const basePath = user?.role === "admin" ? "/creator" : "/instructor";
 
   if (statsQuery.isLoading || coursesQuery.isLoading) return <LoadingSpinner />;
   if (statsQuery.isError || coursesQuery.isError) return <ErrorState description="We could not load instructor stats." onRetry={() => statsQuery.refetch()} />;
@@ -21,8 +24,8 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Instructor dashboard</p>
-        <h1 className="mt-2 text-3xl font-black text-slate-950 dark:text-white">Teach with clarity.</h1>
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">{user?.role === "admin" ? "Creator workspace" : "Instructor dashboard"}</p>
+        <h1 className="mt-2 text-3xl font-black text-slate-950 dark:text-white">Build learning people can finish.</h1>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -36,7 +39,7 @@ export function Dashboard() {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Recent courses</h2>
           <Button asChild variant="outline">
-            <Link to="/instructor/courses">View all</Link>
+            <Link to={`${basePath}/courses`}>View all</Link>
           </Button>
         </div>
         <div className="mt-5 space-y-4">

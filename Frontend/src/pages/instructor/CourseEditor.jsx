@@ -15,11 +15,12 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { CheckCircle2, CircleAlert, Plus, Trash2 } from "lucide-react";
 import { uploadApi } from "@/services/api";
 import { fileToDataUrl } from "@/utils/fileToDataUrl";
+import { useAuth } from "@/hooks/useAuth";
 
 const lessonSchema = z.object({
   _id: z.string().optional(),
   title: z.string().min(2),
-  type: z.enum(["video", "text", "pdf", "quiz", "assignment"]),
+  type: z.enum(["video", "text", "pdf"]),
   content: z.string().optional(),
   videoUrl: z.string().optional(),
   fileUrl: z.string().optional(),
@@ -60,6 +61,8 @@ const schema = z.object({
 export function CourseEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const basePath = user?.role === "admin" ? "/creator" : "/instructor";
   const queryClient = useQueryClient();
   const isEdit = Boolean(id);
   const draftKey = `skillnest-course-draft:${id || "new"}`;
@@ -234,7 +237,7 @@ export function CourseEditor() {
       await queryClient.invalidateQueries({ queryKey: ["courses"] });
       window.localStorage.removeItem(draftKey);
       toast.success(isEdit ? "Course updated" : "Course created");
-      navigate("/instructor/courses");
+      navigate(`${basePath}/courses`);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
@@ -567,8 +570,6 @@ function LessonEditor({ sectionName, lessonIndex, control, register, setValue, r
               <option value="video">Video</option>
               <option value="text">Text</option>
               <option value="pdf">PDF</option>
-              <option value="quiz">Quiz</option>
-              <option value="assignment">Assignment</option>
             </Select>
           )}
         </Field>

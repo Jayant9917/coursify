@@ -10,9 +10,12 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { formatPrice } from "@/utils/formatPrice";
 import { formatDate } from "@/utils/formatDate";
 import { courseApi, getApiErrorMessage } from "@/services/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export function MyCourses() {
   const coursesQuery = useInstructorCourses({ limit: 50 });
+  const { user } = useAuth();
+  const basePath = user?.role === "admin" ? "/creator" : "/instructor";
   const queryClient = useQueryClient();
   const [busyId, setBusyId] = useState("");
 
@@ -42,7 +45,7 @@ export function MyCourses() {
           <p className="mt-2 text-slate-600">Create, edit, and publish courses.</p>
         </div>
         <Button asChild>
-          <Link to="/instructor/courses/new">New course</Link>
+          <Link to={`${basePath}/courses/new`}>New course</Link>
         </Button>
       </Card>
 
@@ -63,10 +66,10 @@ export function MyCourses() {
                   <Badge variant="outline">{course.level}</Badge>
                   <span className="whitespace-nowrap px-1 text-sm font-medium text-slate-600">{formatPrice(course.discountPrice || course.price)}</span>
                   <Button asChild variant="outline" className="shrink-0 whitespace-nowrap">
-                    <Link to={`/instructor/courses/${course._id}/preview`}>Preview</Link>
+                    <Link to={`${basePath}/courses/${course._id}/preview`}>Preview</Link>
                   </Button>
                   <Button asChild variant="outline" className="shrink-0 whitespace-nowrap">
-                    <Link to={`/instructor/courses/${course._id}/edit`}>Edit</Link>
+                    <Link to={`${basePath}/courses/${course._id}/edit`}>Edit</Link>
                   </Button>
                   <Button variant="outline" className="shrink-0 whitespace-nowrap" disabled={busyId === course._id} onClick={() => runAction(course, courseApi.duplicate, "Course duplicated")}>Duplicate</Button>
                   {!course.isPublished && course.workflowStatus !== "pending_review" ? <Button variant="outline" className="shrink-0 whitespace-nowrap" disabled={busyId === course._id} onClick={() => runAction(course, courseApi.requestReview, "Course submitted for review")}>Submit review</Button> : null}

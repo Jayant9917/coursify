@@ -104,6 +104,73 @@ test("refunded enrollment cannot access lesson media", async (t) => {
   );
 });
 
+test("V1 journey persists paid access, protected media, progress, and refund revocation", async (t) => {
+  if (!requireDatabase()) return t.skip("TEST_MONGODB_URL is not configured");
+
+  const { student, course } = await createFixture({ price: 1500 });
+  const admin = await User.create({ name: "Platform Owner", email: `owner-${Date.now()}@test.local`, passwordHash: "hash", role: "admin" });
+  const section = await CourseSection.create({ courseId: course._id, title: "Core lessons", order: 1 });
+  const videoLesson = await Lesson.create({
+    courseId: course._id,
+    sectionId: section._id,
+    title: "Video lesson",
+    type: "video",
+    order: 1,
+    fileKey: "lesson-videos/v1.mp4",
+  });
+  const pdfLesson = await Lesson.create({
+    courseId: course._id,
+    sectionId: section._id,
+    title: "PDF lesson",
+    type: "pdf",
+    order: 2,
+    fileKey: "lesson-pdfs/v1.pdf",
+  });
+
+  await assert.rejects(
+    enrollmentService.getLessonAccessUrl({ id: student._id, role: "student" }, course._id, videoLesson._id),
+    (error) => error.statusCode === 403
+  );
+
+  const order = await Order.create({
+    userId: student._id,
+    amount: 1500,
+    currency: "INR",
+    status: "paid",
+    paymentProvider: "manual",
+  });
+  await OrderItem.create({ orderId: order._id, courseId: course._id, priceAtPurchase: 1500 });
+
+  const enrollment = await enrollmentService.enroll({ id: student._id, role: "student" }, { courseId: course._id });
+  assert.equal(String(enrollment.courseId), String(course._id));
+
+  const videoAccess = await enrollmentService.getLessonAccessUrl({ id: student._id, role: "student" }, course._id, videoLesson._id);
+  const pdfAccess = await enrollmentService.getLessonAccessUrl({ id: student._id, role: "student" }, course._id, pdfLesson._id);
+  assert.match(videoAccess.url, /https?:\/\//);
+  assert.match(pdfAccess.url, /https?:\/\//);
+  assert.notEqual(videoAccess.url, videoLesson.fileKey);
+  assert.notEqual(pdfAccess.url, pdfLesson.fileKey);
+
+  await enrollmentService.updateProgress(
+    { id: student._id, role: "student" },
+    { courseId: course._id, lessonId: videoLesson._id, watchedSeconds: 42, isCompleted: true }
+  );
+  const progress = await enrollmentService.getCourseProgress({ id: student._id, role: "student" }, course._id);
+  assert.equal(progress.length, 1);
+  assert.equal(progress[0].watchedSeconds, 42);
+  assert.equal(progress[0].isCompleted, true);
+
+  const resumedEnrollment = await Enrollment.findOne({ userId: student._id, courseId: course._id }).lean();
+  assert.equal(String(resumedEnrollment.lastViewedLessonId), String(videoLesson._id));
+  assert.equal(resumedEnrollment.progressPercent, 50);
+
+  await orderService.recordAdminRefund({ id: admin._id, role: "admin" }, order._id, {});
+  await assert.rejects(
+    enrollmentService.getLessonAccessUrl({ id: student._id, role: "student" }, course._id, videoLesson._id),
+    (error) => error.statusCode === 403
+  );
+});
+
 test("transaction rollback restores coupon state after a failed write", async (t) => {
   if (!requireDatabase()) return t.skip("TEST_MONGODB_URL is not configured");
   const coupon = await Coupon.create({ code: `ROLLBACK${Date.now()}`, type: "percent", value: 10, reservedCount: 0 });

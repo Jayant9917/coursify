@@ -882,7 +882,10 @@ const courseSearchFilter = (query) => {
 
 const authService = {
   async register(payload) {
-    ensureRoleAllowed(payload.role || "student");
+    if (payload.role && payload.role !== "student") {
+      throw new ApiError(400, "Only student accounts can be created through public registration");
+    }
+    ensureRoleAllowed("student");
 
     const existingUser = await User.findOne({ email: payload.email.toLowerCase() });
     if (existingUser) {
@@ -894,7 +897,7 @@ const authService = {
       name: payload.name,
       email: payload.email.toLowerCase(),
       passwordHash,
-      role: payload.role || "student",
+      role: "student",
       avatar: payload.avatar || "",
       bio: payload.bio || "",
     });
@@ -1201,12 +1204,14 @@ const courseService = {
       categoryId: payload.categoryId || null,
       instructorId: actor.role === "admin" && payload.instructorId ? payload.instructorId : actor.id,
       tags: payload.tags || [],
-      isPublished: Boolean(payload.isPublished),
+      // Courses always start as drafts. Publishing must go through the
+      // validated publish/request-review flow after curriculum is present.
+      isPublished: false,
       isFeatured: Boolean(payload.isFeatured),
       maxSeats: payload.maxSeats === undefined ? null : payload.maxSeats,
       seoTitle: payload.seoTitle || "",
       seoDescription: payload.seoDescription || "",
-      workflowStatus: payload.isPublished ? (config.courseApprovalRequired ? "pending_review" : "approved") : "draft",
+      workflowStatus: "draft",
     });
     await createCourseVersion(course, actor, "Initial course version");
     return course;

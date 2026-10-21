@@ -94,7 +94,26 @@ export function AppRoutes() {
           path="/instructor"
           element={
             <ProtectedRoute>
-              <RoleGuard allowedRoles={["instructor"]}>
+              <RoleGuard allowedRoles={["instructor", "admin"]}>
+                <InstructorLayout />
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<InstructorDashboard />} />
+          <Route path="courses" element={<InstructorCourses />} />
+          <Route path="courses/new" element={<CourseEditor />} />
+          <Route path="courses/:id/edit" element={<CourseEditor />} />
+          <Route path="courses/:id/preview" element={<CoursePreview />} />
+          <Route path="stats" element={<InstructorStats />} />
+          <Route path="profile" element={<InstructorProfile />} />
+        </Route>
+
+        <Route
+          path="/creator"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allowedRoles={["admin"]}>
                 <InstructorLayout />
               </RoleGuard>
             </ProtectedRoute>

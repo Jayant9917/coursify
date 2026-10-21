@@ -10,7 +10,6 @@ const authRegisterSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email(),
   password: z.string().min(8).max(128),
-  role: z.enum(["student", "instructor"]).optional(),
   avatar: z.string().url().optional().or(z.literal("")),
   bio: z.string().max(500).optional(),
 });
@@ -86,7 +85,7 @@ const sectionSchema = z.object({
 
 const lessonSchema = z.object({
   title: z.string().min(2).max(180),
-  type: z.enum(["video", "text", "pdf", "quiz", "assignment"]),
+  type: z.enum(["video", "text", "pdf"]),
   content: z.string().optional(),
   videoUrl: z.string().url().optional().or(z.literal("")),
   fileKey: z.string().min(1).optional().or(z.literal("")),
