@@ -52,10 +52,10 @@ export function Dashboard() {
   const stats = {
     enrolled: enrollments.length,
     completed: enrollments.filter((item) => item.status === "completed").length,
-    inProgress: enrollments.filter((item) => item.status !== "completed").length,
+    inProgress: enrollments.filter((item) => !["completed", "suspended", "refunded"].includes(item.status)).length,
   };
   const activeCourses = enrollments
-    .filter((item) => item.status !== "completed")
+    .filter((item) => !["completed", "suspended", "refunded"].includes(item.enrollment.status))
     .slice(0, 3)
     .map((enrollment) => ({ enrollment, course: findCourseById(catalog, enrollment.courseId) }))
     .filter((item) => item.course);

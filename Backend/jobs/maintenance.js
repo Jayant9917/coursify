@@ -1,6 +1,7 @@
 const config = require("../config");
 const { log } = require("../utils/logger");
-const { expirePendingOrders, releaseExpiredCouponReservations } = require("../services");
+const { expirePendingOrders, releaseExpiredCouponReservations, reconcilePaidOrders } = require("../services");
+const uploadService = require("../services/upload");
 
 let timer = null;
 let running = false;
@@ -9,12 +10,15 @@ const runCouponCleanup = async () => {
   if (running) return;
   running = true;
   try {
-    const [released, expired] = await Promise.all([
+    const [released, expired, reconciled, mediaCleaned, staleLocalUploads] = await Promise.all([
       releaseExpiredCouponReservations(),
       expirePendingOrders(),
+      reconcilePaidOrders(),
+      config.mediaStorageProvider === "s3" ? uploadService.cleanupExpiredS3MultipartUploads() : Promise.resolve(0),
+      uploadService.cleanupStaleLocalUploads(),
     ]);
-    if (released > 0 || expired > 0) {
-      log("info", "payment.cleanup_completed", { releasedCouponReservations: released, expiredOrders: expired });
+    if (released > 0 || expired > 0 || reconciled.failed > 0 || mediaCleaned > 0 || staleLocalUploads > 0) {
+      log("info", "maintenance.cleanup_completed", { releasedCouponReservations: released, expiredOrders: expired, reconciliation: reconciled, mediaCleaned, staleLocalUploads });
     }
   } catch (error) {
     log("error", "coupon.cleanup_failed", {

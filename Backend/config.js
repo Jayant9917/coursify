@@ -39,6 +39,7 @@ const config = {
   lemonSqueezyWebhookSecret: process.env.LEMONSQUEEZY_WEBHOOK_SECRET || "",
   lemonSqueezyAmountToleranceMinor: Number(process.env.LEMONSQUEEZY_AMOUNT_TOLERANCE_MINOR || 100),
   lemonSqueezyCheckoutTtlMinutes: Math.max(1, Number(process.env.LEMONSQUEEZY_CHECKOUT_TTL_MINUTES || 5)),
+  courseApprovalRequired: process.env.COURSE_APPROVAL_REQUIRED === "true",
   couponCleanupIntervalMs: Number(process.env.COUPON_CLEANUP_INTERVAL_MS || 60000),
   redisUrl: process.env.REDIS_URL || "",
   cacheTtlSeconds: Number(process.env.CACHE_TTL_SECONDS || 30),
@@ -52,10 +53,15 @@ const config = {
   s3MultipartPartBytes: Math.max(5, Number(process.env.S3_MULTIPART_PART_MB || 8)) * 1024 * 1024,
   s3PresignExpiresSeconds: Math.min(3600, Math.max(60, Number(process.env.S3_PRESIGN_EXPIRES_SECONDS || 900))),
   s3MultipartSessionTtlHours: Math.max(1, Number(process.env.S3_MULTIPART_SESSION_TTL_HOURS || 24)),
+  s3MaxUploadBytes: Math.max(1, Number(process.env.S3_MAX_UPLOAD_MB || 5000)) * 1024 * 1024,
 };
 
 if (!["s3", "local"].includes(config.mediaStorageProvider)) {
   throw new Error("MEDIA_STORAGE_PROVIDER must be either s3 or local");
+}
+
+if (process.env.NODE_ENV === "production" && config.mediaStorageProvider !== "s3") {
+  throw new Error("MEDIA_STORAGE_PROVIDER=s3 is required in production");
 }
 
 if (!["resend", "console"].includes(config.emailProvider)) {

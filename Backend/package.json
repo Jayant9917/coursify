@@ -9,6 +9,7 @@
     "seed": "node seed.js",
     "db:reset": "node scripts/resetDatabase.js",
     "migrate:refunded-enrollments": "node scripts/migrateRefundedEnrollments.js",
+    "payment:verify": "node scripts/verifyLemonSqueezyConfig.js",
     "test": "node --test --test-concurrency=1 test/integration/*.test.js test/unit/*.test.js",
     "lint": "eslint . --ext .js --ignore-pattern node_modules",
     "load": "node test/load/health.load.js"

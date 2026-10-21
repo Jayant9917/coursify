@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2, CircleAlert, Clock3, RotateCw, ShoppingBag } from "lucide-react";
-import { useOrderStatus } from "@/hooks/useOrders";
+import { useCancelOrder, useOrderStatus } from "@/hooks/useOrders";
 import { Button, Card } from "@/components/ui";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorState } from "@/components/common/ErrorState";
@@ -11,6 +11,7 @@ export function PaymentResult() {
   const orderId = searchParams.get("orderId") || "";
   const paymentState = searchParams.get("payment") || "success";
   const orderQuery = useOrderStatus(orderId);
+  const cancelOrder = useCancelOrder();
 
   if (paymentState === "cancelled" || paymentState === "canceled") {
     return <PaymentState icon={ShoppingBag} title="Checkout canceled" description="No payment was confirmed. You can return to the course and try again whenever you are ready." actions={[{ label: "Browse courses", href: "/courses" }]} />;
@@ -32,11 +33,23 @@ export function PaymentResult() {
     return <PaymentState icon={CircleAlert} tone="danger" title="Payment refunded" description="This order was refunded, so course access is no longer active." orderId={orderId} actions={[{ label: "Browse courses", href: "/courses" }]} />;
   }
 
+  if (order?.status === "refund_pending") {
+    return <PaymentState icon={Clock3} tone="pending" title="Refund is being reviewed" description="This payment arrived after checkout expired. We are completing the refund before granting access." orderId={orderId} actions={[{ label: "Refresh status", onClick: () => orderQuery.refetch(), icon: RotateCw }, { label: "Go to dashboard", href: "/student/dashboard" }]} />;
+  }
+
+  if (order?.status === "disputed") {
+    return <PaymentState icon={CircleAlert} tone="danger" title="Payment under review" description="The payment provider has placed this payment under review. Course access is temporarily suspended while it is resolved." orderId={orderId} actions={[{ label: "Refresh status", onClick: () => orderQuery.refetch(), icon: RotateCw }, { label: "Go to dashboard", href: "/student/dashboard" }]} />;
+  }
+
+  if (order?.status === "cancelled") {
+    return <PaymentState icon={ShoppingBag} title="Checkout canceled" description="This pending checkout was canceled and no course access was created." orderId={orderId} actions={[{ label: "Browse courses", href: "/courses" }]} />;
+  }
+
   if (order?.status === "failed") {
     return <PaymentState icon={CircleAlert} tone="danger" title="Payment failed" description="The payment was not completed. No course enrollment was created for this order." orderId={orderId} actions={[{ label: "Try again", href: "/courses" }]} />;
   }
 
-  return <PaymentState icon={Clock3} tone="pending" title="Payment is being confirmed" description="Lemon Squeezy has returned you to Skillnest. We are waiting for the verified webhook before granting course access." orderId={orderId} actions={[{ label: "Refresh status", onClick: () => orderQuery.refetch(), icon: RotateCw }, { label: "Go to dashboard", href: "/student/dashboard" }]} />;
+  return <PaymentState icon={Clock3} tone="pending" title="Payment is being confirmed" description="Lemon Squeezy has returned you to Skillnest. We are waiting for the verified webhook before granting course access." orderId={orderId} actions={[{ label: "Refresh status", onClick: () => orderQuery.refetch(), icon: RotateCw }, { label: "Cancel checkout", onClick: () => cancelOrder.mutate(orderId), disabled: cancelOrder.isPending }, { label: "Go to dashboard", href: "/student/dashboard" }]} />;
 }
 
 function PaymentState({ icon: Icon, tone = "neutral", title, description, orderId, actions = [] }) {
@@ -63,7 +76,7 @@ function PaymentState({ icon: Icon, tone = "neutral", title, description, orderI
               <a href={action.href}>{action.label}<ArrowRight className="h-4 w-4" /></a>
             </Button>
           ) : (
-            <Button key={action.label} variant="outline" onClick={action.onClick}>
+            <Button key={action.label} variant="outline" onClick={action.onClick} disabled={action.disabled}>
               {action.icon ? <action.icon className="h-4 w-4" /> : null}{action.label}
             </Button>
           ))}

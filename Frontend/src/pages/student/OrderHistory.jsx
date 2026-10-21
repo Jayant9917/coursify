@@ -1,4 +1,4 @@
-import { useOrders } from "@/hooks/useOrders";
+import { useCancelOrder, useOrders } from "@/hooks/useOrders";
 import { Card, Badge, Button } from "@/components/ui";
 import { Clock3, ExternalLink } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -8,6 +8,7 @@ import { formatDate } from "@/utils/formatDate";
 
 export function OrderHistory() {
   const ordersQuery = useOrders();
+  const cancelOrder = useCancelOrder();
 
   if (ordersQuery.isLoading) return <LoadingSpinner />;
   if (ordersQuery.isError) return <ErrorState description="We could not load your orders." onRetry={() => ordersQuery.refetch()} />;
@@ -30,7 +31,7 @@ export function OrderHistory() {
                   <p className="font-semibold text-slate-950 dark:text-white">Order #{order._id.slice(-6)}</p>
                   <p className="text-sm text-slate-500 dark:text-neutral-400">Placed {formatDate(order.createdAt)}</p>
                 </div>
-                <Badge variant={order.status === "paid" ? "success" : order.status === "failed" ? "danger" : order.status === "refunded" ? "warning" : "secondary"}>{order.status}</Badge>
+                <Badge variant={order.status === "paid" ? "success" : ["failed", "disputed"].includes(order.status) ? "danger" : ["refunded", "refund_pending"].includes(order.status) ? "warning" : "secondary"}>{order.status.replaceAll("_", " ")}</Badge>
               </div>
               <div className="mt-4 flex items-center justify-between">
                 <p className="text-sm text-slate-500 dark:text-neutral-400">{order.currency}</p>
@@ -39,7 +40,7 @@ export function OrderHistory() {
               {order.status === "pending" ? (
                 <div className="mt-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
                   <p className="flex items-center gap-2 text-sm"><Clock3 className="h-4 w-4" />Payment is waiting for completion. Checkout expires in 5 minutes.</p>
-                  {order.checkoutUrl && (!order.expiresAt || new Date(order.expiresAt).getTime() > Date.now()) ? <Button size="sm" onClick={() => window.location.assign(order.checkoutUrl)}><ExternalLink className="h-4 w-4" />Continue payment</Button> : null}
+                  {order.checkoutUrl && (!order.expiresAt || new Date(order.expiresAt).getTime() > Date.now()) ? <div className="flex gap-2"><Button size="sm" onClick={() => window.location.assign(order.checkoutUrl)}><ExternalLink className="h-4 w-4" />Continue payment</Button><Button size="sm" variant="outline" onClick={() => cancelOrder.mutate(order._id)} disabled={cancelOrder.isPending}>Cancel</Button></div> : null}
                 </div>
               ) : null}
             </Card>

@@ -19,6 +19,15 @@ const requestDuration = new client.Histogram({
   registers: [registry],
 });
 
+const paymentEvents = new client.Counter({
+  name: "coursify_payment_events_total",
+  help: "Payment state transitions and notifications processed",
+  labelNames: ["event"],
+  registers: [registry],
+});
+
+const paymentEvent = (event) => paymentEvents.inc({ event: String(event || "unknown").slice(0, 60) });
+
 const requestMetrics = (req, res, next) => {
   if (!config.metricsEnabled) return next();
   const startedAt = process.hrtime.bigint();
@@ -40,4 +49,4 @@ const metricsHandler = async (req, res) => {
   return res.end(await registry.metrics());
 };
 
-module.exports = { requestMetrics, metricsHandler, registry };
+module.exports = { requestMetrics, metricsHandler, registry, paymentEvent };

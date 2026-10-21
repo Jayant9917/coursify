@@ -59,6 +59,13 @@ const courseSchema = new Schema(
     isPublished: { type: Boolean, default: false },
     isFeatured: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false, index: true },
+    workflowStatus: { type: String, enum: ["draft", "pending_review", "approved", "rejected"], default: "draft", index: true },
+    rejectionReason: { type: String, default: "" },
+    seoTitle: { type: String, default: "", maxlength: 180 },
+    seoDescription: { type: String, default: "", maxlength: 320 },
+    archivedAt: { type: Date, default: null },
+    archivedBy: { type: ObjectId, default: null },
+    currentVersion: { type: Number, default: 1, min: 1 },
     ratingAvg: { type: Number, default: 0 },
     ratingCount: { type: Number, default: 0 },
     enrollmentCount: { type: Number, default: 0 },
@@ -80,6 +87,19 @@ const courseSectionSchema = new Schema(
 
 courseSectionSchema.index({ courseId: 1, order: 1 }, { unique: true });
 
+const courseVersionSchema = new Schema(
+  {
+    courseId: { type: ObjectId, required: true, index: true },
+    version: { type: Number, required: true, min: 1 },
+    createdBy: { type: ObjectId, required: true },
+    changeNote: { type: String, default: "" },
+    snapshot: { type: Schema.Types.Mixed, required: true },
+  },
+  { timestamps: true }
+);
+
+courseVersionSchema.index({ courseId: 1, version: 1 }, { unique: true });
+
 const lessonSchema = new Schema(
   {
     courseId: { type: ObjectId, required: true, index: true },
@@ -87,13 +107,14 @@ const lessonSchema = new Schema(
     title: { type: String, required: true, trim: true },
     type: {
       type: String,
-      enum: ["video", "text", "pdf", "quiz"],
+      enum: ["video", "text", "pdf", "quiz", "assignment"],
       required: true,
     },
     content: { type: String, default: "" },
     videoUrl: { type: String, default: "" },
     fileUrl: { type: String, default: "" },
     fileKey: { type: String, default: "" },
+    thumbnailUrl: { type: String, default: "" },
     duration: { type: Number, default: 0 },
     isPreview: { type: Boolean, default: false },
     order: { type: Number, required: true },
@@ -110,7 +131,7 @@ const enrollmentSchema = new Schema(
     courseId: { type: ObjectId, required: true, index: true },
     status: {
       type: String,
-      enum: ["active", "completed", "refunded"],
+      enum: ["active", "completed", "refunded", "suspended"],
       default: "active",
     },
     progressPercent: { type: Number, default: 0 },
@@ -129,7 +150,7 @@ const orderSchema = new Schema(
     currency: { type: String, default: "INR" },
     status: {
       type: String,
-      enum: ["pending", "paid", "failed", "refunded"],
+      enum: ["pending", "paid", "failed", "refunded", "cancelled", "refund_pending", "disputed"],
       default: "pending",
       index: true,
     },
@@ -142,6 +163,13 @@ const orderSchema = new Schema(
     couponReservationExpiresAt: { type: Date, default: null },
     couponReservationReleased: { type: Boolean, default: false },
     couponRedeemedAt: { type: Date, default: null },
+    failureReason: { type: String, default: "" },
+    providerEventName: { type: String, default: "" },
+    providerRefundId: { type: String, default: "" },
+    refundStatus: { type: String, enum: ["none", "pending", "completed", "failed"], default: "none" },
+    refundedAt: { type: Date, default: null },
+    disputeStatus: { type: String, enum: ["none", "open", "resolved"], default: "none" },
+    reconciliationStatus: { type: String, enum: ["not_required", "pending", "resolved", "failed"], default: "not_required" },
   },
   { timestamps: true }
 );
@@ -232,6 +260,29 @@ const courseProgressSchema = new Schema(
 
 courseProgressSchema.index({ userId: 1, courseId: 1, lessonId: 1 }, { unique: true });
 
+const learningBookmarkSchema = new Schema({ userId: { type: ObjectId, required: true, index: true }, courseId: { type: ObjectId, required: true, index: true }, lessonId: { type: ObjectId, required: true, index: true } }, { timestamps: true });
+learningBookmarkSchema.index({ userId: 1, courseId: 1, lessonId: 1 }, { unique: true });
+
+const lessonNoteSchema = new Schema({ userId: { type: ObjectId, required: true, index: true }, courseId: { type: ObjectId, required: true, index: true }, lessonId: { type: ObjectId, required: true, index: true }, content: { type: String, required: true, maxlength: 10000 } }, { timestamps: true });
+lessonNoteSchema.index({ userId: 1, courseId: 1, lessonId: 1 }, { unique: true });
+
+const quizAttemptSchema = new Schema({ userId: { type: ObjectId, required: true, index: true }, courseId: { type: ObjectId, required: true, index: true }, lessonId: { type: ObjectId, required: true, index: true }, score: { type: Number, min: 0, max: 100 }, passed: { type: Boolean, default: false }, answers: { type: Schema.Types.Mixed, default: {} } }, { timestamps: true });
+quizAttemptSchema.index({ userId: 1, lessonId: 1, createdAt: -1 });
+
+const certificateSchema = new Schema({ userId: { type: ObjectId, required: true, index: true }, courseId: { type: ObjectId, required: true, index: true }, certificateNumber: { type: String, required: true, unique: true, index: true }, issuedAt: { type: Date, default: Date.now } }, { timestamps: true });
+certificateSchema.index({ userId: 1, courseId: 1 }, { unique: true });
+
+const assignmentSubmissionSchema = new Schema({
+  userId: { type: ObjectId, required: true, index: true },
+  courseId: { type: ObjectId, required: true, index: true },
+  lessonId: { type: ObjectId, required: true, index: true },
+  content: { type: String, required: true, maxlength: 20000 },
+  status: { type: String, enum: ["submitted", "reviewed", "returned"], default: "submitted", index: true },
+  grade: { type: Number, min: 0, max: 100, default: null },
+  feedback: { type: String, default: "", maxlength: 5000 },
+}, { timestamps: true });
+assignmentSubmissionSchema.index({ userId: 1, lessonId: 1 }, { unique: true });
+
 const importedPlaylistSchema = new Schema(
   {
     userId: { type: ObjectId, required: true, index: true },
@@ -298,6 +349,9 @@ const notificationSchema = new Schema(
     title: { type: String, required: true, trim: true },
     message: { type: String, required: true },
     read: { type: Boolean, default: false },
+    dedupeKey: { type: String, default: "" },
+    relatedOrderId: { type: ObjectId, default: null, index: true },
+    metadata: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );
@@ -350,6 +404,22 @@ const webhookDeliverySchema = new Schema(
 );
 
 webhookDeliverySchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
+
+const paymentReconciliationSchema = new Schema(
+  {
+    orderId: { type: ObjectId, required: true, unique: true, index: true },
+    userId: { type: ObjectId, required: true, index: true },
+    issue: { type: String, enum: ["paid_not_enrolled", "refund_failed", "dispute_review"], required: true },
+    status: { type: String, enum: ["open", "resolved"], default: "open", index: true },
+    attempts: { type: Number, default: 0, min: 0 },
+    lastError: { type: String, default: "" },
+    details: { type: Schema.Types.Mixed, default: {} },
+    resolvedAt: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
+
+paymentReconciliationSchema.index({ status: 1, createdAt: -1 });
 
 const noteSchema = new Schema(
   {
@@ -414,6 +484,10 @@ const mediaUploadSchema = new Schema(
     key: { type: String, required: true },
     folder: { type: String, required: true },
     contentType: { type: String, required: true },
+    fileName: { type: String, default: "" },
+    size: { type: Number, default: 0, min: 0 },
+    thumbnailUrl: { type: String, default: "" },
+    durationSeconds: { type: Number, default: 0, min: 0 },
     status: { type: String, enum: ["initiated", "completed", "aborted"], default: "initiated", index: true },
     expiresAt: { type: Date, required: true },
   },
@@ -429,6 +503,7 @@ const User = mongoose.models.User || mongoose.model("User", userSchema);
 const Category = mongoose.models.Category || mongoose.model("Category", categorySchema);
 const Course = mongoose.models.Course || mongoose.model("Course", courseSchema);
 const CourseSection = mongoose.models.CourseSection || mongoose.model("CourseSection", courseSectionSchema);
+const CourseVersion = mongoose.models.CourseVersion || mongoose.model("CourseVersion", courseVersionSchema);
 const Lesson = mongoose.models.Lesson || mongoose.model("Lesson", lessonSchema);
 const Enrollment = mongoose.models.Enrollment || mongoose.model("Enrollment", enrollmentSchema);
 const Order = mongoose.models.Order || mongoose.model("Order", orderSchema);
@@ -438,6 +513,11 @@ const CourseSeatReservation =
 const Review = mongoose.models.Review || mongoose.model("Review", reviewSchema);
 const Wishlist = mongoose.models.Wishlist || mongoose.model("Wishlist", wishlistSchema);
 const CourseProgress = mongoose.models.CourseProgress || mongoose.model("CourseProgress", courseProgressSchema);
+const LearningBookmark = mongoose.models.LearningBookmark || mongoose.model("LearningBookmark", learningBookmarkSchema);
+const LessonNote = mongoose.models.LessonNote || mongoose.model("LessonNote", lessonNoteSchema);
+const QuizAttempt = mongoose.models.QuizAttempt || mongoose.model("QuizAttempt", quizAttemptSchema);
+const Certificate = mongoose.models.Certificate || mongoose.model("Certificate", certificateSchema);
+const AssignmentSubmission = mongoose.models.AssignmentSubmission || mongoose.model("AssignmentSubmission", assignmentSubmissionSchema);
 const ImportedPlaylist =
   mongoose.models.ImportedPlaylist || mongoose.model("ImportedPlaylist", importedPlaylistSchema);
 const ImportedPlaylistVideo =
@@ -452,12 +532,14 @@ const Note = mongoose.models.Note || mongoose.model("Note", noteSchema);
 const NotePurchase = mongoose.models.NotePurchase || mongoose.model("NotePurchase", notePurchaseSchema);
 const AuditLog = mongoose.models.AuditLog || mongoose.model("AuditLog", auditLogSchema);
 const MediaUpload = mongoose.models.MediaUpload || mongoose.model("MediaUpload", mediaUploadSchema);
+const PaymentReconciliation = mongoose.models.PaymentReconciliation || mongoose.model("PaymentReconciliation", paymentReconciliationSchema);
 
 module.exports = {
   User,
   Category,
   Course,
   CourseSection,
+  CourseVersion,
   Lesson,
   Enrollment,
   Order,
@@ -466,6 +548,11 @@ module.exports = {
   Review,
   Wishlist,
   CourseProgress,
+  LearningBookmark,
+  LessonNote,
+  QuizAttempt,
+  Certificate,
+  AssignmentSubmission,
   ImportedPlaylist,
   ImportedPlaylistVideo,
   Coupon,
@@ -477,4 +564,5 @@ module.exports = {
   NotePurchase,
   AuditLog,
   MediaUpload,
+  PaymentReconciliation,
 };

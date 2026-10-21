@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { CheckCircle2, FileText, Lock, Play, Video, CircleDashed } from "lucide-react";
 import { useCourses, useCourseDetail } from "@/hooks/useCourses";
@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { findCourseById, getEnrollmentForCourse, groupLessonsBySection, normalizeId } from "@/utils/courseUtils";
 import { getPreviousRoute } from "@/utils/routeHistory";
 import { stripHtml } from "@/utils/sanitizeHtml";
-import { courseApi, getApiErrorMessage } from "@/services/api";
+import { courseApi, enrollmentApi, getApiErrorMessage } from "@/services/api";
 import { toast } from "sonner";
 
 export function LessonPlayer() {
@@ -25,6 +25,11 @@ export function LessonPlayer() {
   const [currentLessonId, setCurrentLessonId] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [mediaError, setMediaError] = useState("");
+  const [lessonNote, setLessonNote] = useState("");
+  const [bookmarked, setBookmarked] = useState(false);
+  const [noteSaving, setNoteSaving] = useState(false);
+  const videoRef = useRef(null);
+  const lastProgressSync = useRef(0);
 
   const catalog = courseCatalogQuery.data?.data || courseCatalogQuery.data || [];
   const courseSummary = findCourseById(catalog, id);
@@ -36,6 +41,7 @@ export function LessonPlayer() {
   const lessons = detailQuery.data?.lessons || [];
   const lessonsBySection = useMemo(() => groupLessonsBySection(lessons), [lessons]);
   const completedIds = new Set((progressQuery.data || []).filter((record) => record.isCompleted).map((record) => normalizeId(record.lessonId)));
+  const currentProgress = (progressQuery.data || []).find((record) => normalizeId(record.lessonId) === normalizeId(currentLessonId));
   const completionPercent = enrollment?.progressPercent || 0;
   const goBack = () => {
     const previousRoute = getPreviousRoute();
@@ -51,6 +57,23 @@ export function LessonPlayer() {
   }, [currentLessonId, enrollment, lessons]);
 
   const currentLesson = lessons.find((lesson) => normalizeId(lesson._id) === normalizeId(currentLessonId));
+
+  useEffect(() => {
+    if (!currentLesson) return undefined;
+    let active = true;
+    Promise.all([enrollmentApi.listLessonNotes(id), enrollmentApi.listBookmarks(id)])
+      .then(([notes, bookmarks]) => {
+        if (!active) return;
+        setLessonNote((notes || []).find((note) => normalizeId(note.lessonId) === normalizeId(currentLesson._id))?.content || "");
+        setBookmarked((bookmarks || []).some((item) => normalizeId(item.lessonId) === normalizeId(currentLesson._id)));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [id, currentLesson]);
+
+  useEffect(() => {
+    if (videoRef.current && currentProgress?.watchedSeconds) videoRef.current.currentTime = Number(currentProgress.watchedSeconds);
+  }, [currentLessonId, currentProgress?.watchedSeconds]);
 
   useEffect(() => {
     let active = true;
@@ -88,6 +111,14 @@ export function LessonPlayer() {
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
+  };
+
+  const syncVideoProgress = (event) => {
+    if (!enrollment || !currentLesson || !event.currentTarget.duration) return;
+    const now = Date.now();
+    if (now - lastProgressSync.current < 5000) return;
+    lastProgressSync.current = now;
+    updateProgress.mutate({ courseId: id, lessonId: currentLesson._id, watchedSeconds: Math.floor(event.currentTarget.currentTime), isCompleted: false });
   };
 
   return (
@@ -142,7 +173,7 @@ export function LessonPlayer() {
                 <p>Select a lesson to begin.</p>
               </div>
             ) : currentLesson.type === "video" ? (
-              mediaUrl ? <video controls className="w-full" src={mediaUrl} /> : <div className="grid min-h-[420px] place-items-center text-white"><p>{mediaError || "Loading lesson video..."}</p></div>
+              mediaUrl ? <video ref={videoRef} controls className="w-full" src={mediaUrl} onTimeUpdate={syncVideoProgress} onEnded={() => completeLesson(currentLesson)} /> : <div className="grid min-h-[420px] place-items-center text-white"><p>{mediaError || "Loading lesson video..."}</p></div>
             ) : currentLesson.type === "pdf" ? (
               <div className="space-y-3 bg-white p-4">
                 {mediaUrl ? <iframe title={currentLesson.title} src={mediaUrl} className="h-[520px] w-full bg-white" /> : <p className="p-4 text-slate-600">{mediaError || "Loading PDF..."}</p>}
@@ -158,13 +189,15 @@ export function LessonPlayer() {
                 ) : null}
               </div>
             ) : (
-              <div className="prose prose-invert max-w-none p-6 whitespace-pre-line">
+              currentLesson.type === "quiz" ? <QuizBlock lesson={currentLesson} courseId={id} onComplete={() => completeLesson(currentLesson)} /> : currentLesson.type === "assignment" ? <AssignmentBlock lesson={currentLesson} courseId={id} onComplete={() => completeLesson(currentLesson)} /> : <div className="prose prose-invert max-w-none p-6 whitespace-pre-line">
                 <div>{stripHtml(currentLesson.content) || "No content available."}</div>
               </div>
             )}
           </div>
           {currentLesson ? (
             <div className="mt-5 flex flex-wrap gap-3">
+              <Button variant={bookmarked ? "default" : "outline"} onClick={async () => { try { const result = await enrollmentApi.toggleBookmark({ courseId: id, lessonId: currentLesson._id }); setBookmarked(result.bookmarked); } catch (error) { toast.error(getApiErrorMessage(error)); } }}><CheckCircle2 className="h-4 w-4" />{bookmarked ? "Bookmarked" : "Bookmark"}</Button>
+              <Button variant="outline" disabled={noteSaving} onClick={async () => { setNoteSaving(true); try { await enrollmentApi.saveLessonNote({ courseId: id, lessonId: currentLesson._id, content: lessonNote }); toast.success("Note saved"); } catch (error) { toast.error(getApiErrorMessage(error)); } finally { setNoteSaving(false); } }}>Save note</Button>
               <Button onClick={() => completeLesson(currentLesson)} disabled={!enrollment}>
                 <CircleDashed className="h-4 w-4" />
                 Mark complete
@@ -181,4 +214,40 @@ export function LessonPlayer() {
       </div>
     </div>
   );
+}
+
+function QuizBlock({ lesson, courseId, onComplete }) {
+  const [answers, setAnswers] = useState({});
+  const [result, setResult] = useState(null);
+  let quiz = {};
+  try { quiz = JSON.parse(lesson.content || "{}"); } catch { quiz = {}; }
+  const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+  const submit = async () => {
+    try {
+      const response = await enrollmentApi.submitQuiz({ courseId, lessonId: lesson._id, answers });
+      setResult(response);
+      if (response.passed) onComplete();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  };
+
+
+  return <div className="space-y-5 bg-white p-6 text-slate-900">{questions.map((question, index) => <div key={question.id || index} className="space-y-3"><p className="font-semibold">{index + 1}. {question.question}</p>{(question.options || []).map((option) => <label key={option} className="flex items-center gap-2 text-sm"><input type="radio" name={`quiz-${question.id || index}`} value={option} onChange={() => setAnswers((current) => ({ ...current, [question.id || index]: option }))} />{option}</label>)}</div>)}<Button onClick={submit} disabled={!questions.length}>Submit quiz</Button>{result ? <p className={result.passed ? "text-emerald-700" : "text-red-700"}>Score: {result.score}% {result.passed ? "Passed" : "Try again"}</p> : null}</div>;
+}
+
+function AssignmentBlock({ lesson, courseId, onComplete }) {
+  const [content, setContent] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const submit = async () => {
+    try {
+      await enrollmentApi.submitAssignment({ courseId, lessonId: lesson._id, content });
+      setSubmitted(true);
+      toast.success("Assignment submitted");
+      onComplete();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  };
+  return <div className="space-y-4 bg-white p-6 text-slate-900"><div className="whitespace-pre-line text-sm">{stripHtml(lesson.content) || "Submit your work for this assignment."}</div><textarea value={content} onChange={(event) => setContent(event.target.value)} className="min-h-48 w-full rounded-xl border border-slate-300 p-3" placeholder="Write your answer or submission details..." /><Button onClick={submit} disabled={!content.trim() || submitted}>{submitted ? "Submitted" : "Submit assignment"}</Button></div>;
 }

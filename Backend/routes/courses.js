@@ -10,6 +10,7 @@ const {
   lessonSchema,
   reviewSchema,
   lessonAccessSchema,
+  courseReviewSchema,
 } = require("../validators");
 
 const router = Router();
@@ -17,8 +18,13 @@ const router = Router();
 router.get("/", courseController.listPublic);
 router.post("/", requireAuth, requireRole("instructor", "admin"), validate(courseSchema), courseController.create);
 router.get("/admin/all", requireAuth, requireRole("admin"), courseController.adminList);
+router.post("/admin/:id/review", requireAuth, requireRole("admin"), validate(courseReviewSchema), courseController.review);
+router.post("/admin/:id/restore", requireAuth, requireRole("admin"), courseController.restore);
 router.get("/instructor/me", requireAuth, requireRole("instructor", "admin"), courseController.instructorCourses);
 router.get("/instructor/:id", requireAuth, requireRole("instructor", "admin"), courseController.instructorDetails);
+router.get("/:id/versions", requireAuth, requireRole("instructor", "admin"), courseController.versions);
+router.post("/:id/duplicate", requireAuth, requireRole("instructor", "admin"), courseController.duplicate);
+router.post("/:id/request-review", requireAuth, requireRole("instructor", "admin"), courseController.requestReview);
 
 router.post("/:id/sections", requireAuth, requireRole("instructor", "admin"), validate(sectionSchema), sectionController.create);
 router.put("/sections/:id", requireAuth, requireRole("instructor", "admin"), validate(sectionSchema), sectionController.update);

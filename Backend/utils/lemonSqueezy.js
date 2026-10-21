@@ -108,6 +108,27 @@ const createCheckout = async ({
   };
 };
 
+const issueRefund = async ({ providerOrderId, amount = null }) => {
+  const { apiKey } = getLemonSqueezyConfig();
+  if (!providerOrderId) throw new ApiError(400, "Provider order ID is required to issue a refund");
+
+  const attributes = amount === null ? {} : { amount: normalizeMoneyAmount(amount) };
+  const response = await fetch(`https://api.lemonsqueezy.com/v1/orders/${encodeURIComponent(providerOrderId)}/refund`, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.api+json",
+      "Content-Type": "application/vnd.api+json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ data: { type: "orders", id: String(providerOrderId), attributes } }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new ApiError(response.status >= 500 ? 502 : 400, payload?.errors?.[0]?.detail || "Lemon Squeezy refund failed");
+  }
+  return { providerRefundId: String(payload?.data?.id || providerOrderId), raw: payload };
+};
+
 const verifyWebhookSignature = ({ rawBody, signature }) => {
   const { webhookSecret } = getLemonSqueezyConfig();
   if (!webhookSecret) {
@@ -149,6 +170,7 @@ const parseWebhookBody = (body) => {
 
 module.exports = {
   createCheckout,
+  issueRefund,
   parseWebhookBody,
   verifyWebhookSignature,
 };

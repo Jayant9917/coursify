@@ -10,7 +10,6 @@ const authRegisterSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email(),
   password: z.string().min(8).max(128),
-  role: z.enum(["student", "instructor"]).optional(),
   avatar: z.string().url().optional().or(z.literal("")),
   bio: z.string().max(500).optional(),
 });
@@ -64,12 +63,19 @@ const courseSchema = z.object({
   isPublished: z.boolean().optional(),
   isFeatured: z.boolean().optional(),
   maxSeats: z.coerce.number().int().min(1).nullable().optional(),
+  seoTitle: z.string().max(180).optional(),
+  seoDescription: z.string().max(320).optional(),
 });
 
 const courseUpdateSchema = courseSchema.partial();
 
 const publishSchema = z.object({
   isPublished: z.boolean(),
+});
+
+const courseReviewSchema = z.object({
+  status: z.enum(["approved", "rejected"]),
+  reason: z.string().max(500).optional(),
 });
 
 const sectionSchema = z.object({
@@ -79,11 +85,12 @@ const sectionSchema = z.object({
 
 const lessonSchema = z.object({
   title: z.string().min(2).max(180),
-  type: z.enum(["video", "text", "pdf", "quiz"]),
+  type: z.enum(["video", "text", "pdf"]),
   content: z.string().optional(),
   videoUrl: z.string().url().optional().or(z.literal("")),
   fileKey: z.string().min(1).optional().or(z.literal("")),
   fileUrl: z.string().url().optional().or(z.literal("")),
+  thumbnailUrl: z.string().url().optional().or(z.literal("")),
   duration: z.coerce.number().min(0).optional(),
   isPreview: z.boolean().optional(),
   order: z.coerce.number().int().min(1).optional(),
@@ -99,6 +106,11 @@ const progressSchema = z.object({
   watchedSeconds: z.coerce.number().min(0).optional(),
   isCompleted: z.boolean().optional(),
 });
+
+const lessonNoteSchema = z.object({ courseId: objectId, lessonId: objectId, content: z.string().min(1).max(10000) });
+const bookmarkSchema = z.object({ courseId: objectId, lessonId: objectId });
+const quizSubmissionSchema = z.object({ courseId: objectId, lessonId: objectId, answers: z.record(z.any()) });
+const assignmentSubmissionSchema = z.object({ courseId: objectId, lessonId: objectId, content: z.string().min(1).max(20000) });
 
 const orderSchema = z.object({
   courseIds: z.array(objectId).min(1).optional(),
@@ -222,10 +234,15 @@ module.exports = {
   courseSchema,
   courseUpdateSchema,
   publishSchema,
+  courseReviewSchema,
   sectionSchema,
   lessonSchema,
   enrollmentSchema,
   progressSchema,
+  lessonNoteSchema,
+  bookmarkSchema,
+  quizSubmissionSchema,
+  assignmentSubmissionSchema,
   orderSchema,
   reviewSchema,
   categorySchema,

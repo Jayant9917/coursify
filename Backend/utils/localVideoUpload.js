@@ -85,4 +85,20 @@ const cancelUpload = async (actor, uploadId) => {
   return { uploadId, cancelled: true };
 };
 
-module.exports = { startUpload, getStatus, writeChunk, completeUpload, cancelUpload };
+const cleanupStaleUploads = async (maxAgeMs = 24 * 60 * 60 * 1000) => {
+  await ensureDirectories();
+  const entries = await fs.promises.readdir(tempRoot, { withFileTypes: true });
+  let cleaned = 0;
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    const metadataFile = path.join(tempRoot, entry.name);
+    const stats = await fs.promises.stat(metadataFile);
+    if (Date.now() - stats.mtimeMs <= maxAgeMs) continue;
+    const uploadId = entry.name.slice(0, -5);
+    await Promise.all([fs.promises.rm(metadataPath(uploadId), { force: true }), fs.promises.rm(partPath(uploadId), { force: true })]);
+    cleaned += 1;
+  }
+  return cleaned;
+};
+
+module.exports = { startUpload, getStatus, writeChunk, completeUpload, cancelUpload, cleanupStaleUploads };

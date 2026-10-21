@@ -3,6 +3,7 @@
 node_modules/
 dist/
 .vite/
+.tmp-v1-build/
 .env
 .env.*
 Backend/node_modules/

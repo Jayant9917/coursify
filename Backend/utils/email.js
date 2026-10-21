@@ -2,7 +2,7 @@ const { Resend } = require("resend");
 const { render } = require("@react-email/render");
 
 const config = require("../config");
-const { PasswordResetEmail } = require("./emailTemplates");
+const { PasswordResetEmail, PaymentNotificationEmail } = require("./emailTemplates");
 
 let resendClient;
 
@@ -54,4 +54,13 @@ async function sendPasswordResetEmail({ email, resetUrl }) {
   });
 }
 
-module.exports = { isEmailConfigured, sendEmail, sendPasswordResetEmail };
+async function sendPaymentNotificationEmail({ email, title, message, orderId, actionUrl }) {
+  return sendEmail({
+    from: config.emailFromNotifications,
+    to: email,
+    subject: title,
+    react: PaymentNotificationEmail({ title, message, orderId, actionUrl, logoUrl: config.emailLogoUrl }),
+  });
+}
+
+module.exports = { isEmailConfigured, sendEmail, sendPasswordResetEmail, sendPaymentNotificationEmail };

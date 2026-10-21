@@ -93,6 +93,16 @@ const courseController = {
     await recordAudit({ actor: req.user, action: "course.deleted", resourceType: "course", resourceId: req.params.id, request: req });
     send(res, data);
   }),
+  restore: asyncHandler(async (req, res) => {
+    const data = await courseService.restore(req.user, req.params.id);
+    await recordAudit({ actor: req.user, action: "course.restored", resourceType: "course", resourceId: req.params.id, request: req });
+    send(res, data);
+  }),
+  duplicate: asyncHandler(async (req, res) => {
+    const data = await courseService.duplicate(req.user, req.params.id);
+    await recordAudit({ actor: req.user, action: "course.duplicated", resourceType: "course", resourceId: data?._id, metadata: { sourceCourseId: req.params.id }, request: req });
+    send(res, data, 201);
+  }),
   publish: asyncHandler(async (req, res) => {
     const data = await courseService.publish(req.user, req.params.id, req.body.isPublished);
     await recordAudit({ actor: req.user, action: "course.publish_changed", resourceType: "course", resourceId: req.params.id, metadata: { isPublished: req.body.isPublished }, request: req });
@@ -105,6 +115,18 @@ const courseController = {
   instructorCourses: asyncHandler(async (req, res) => {
     const data = await courseService.instructorCourses(req.user.id, req.query);
     send(res, data);
+  }),
+  requestReview: asyncHandler(async (req, res) => {
+    const data = await courseService.requestReview(req.user, req.params.id);
+    send(res, data);
+  }),
+  review: asyncHandler(async (req, res) => {
+    const data = await courseService.review(req.user, req.params.id, req.body.status, req.body.reason);
+    await recordAudit({ actor: req.user, action: "course.reviewed", resourceType: "course", resourceId: req.params.id, metadata: { status: req.body.status }, request: req });
+    send(res, data);
+  }),
+  versions: asyncHandler(async (req, res) => {
+    send(res, await courseService.versions(req.user, req.params.id));
   }),
   instructorDetails: asyncHandler(async (req, res) => {
     const data = await courseService.instructorCourseDetails(req.user, req.params.id);
@@ -159,6 +181,14 @@ const enrollmentController = {
     const data = await enrollmentService.updateProgress(req.user, req.body);
     send(res, data);
   }),
+  bookmark: asyncHandler(async (req, res) => send(res, await enrollmentService.toggleBookmark(req.user, req.body))),
+  bookmarks: asyncHandler(async (req, res) => send(res, await enrollmentService.listBookmarks(req.user, req.query.courseId))),
+  saveNote: asyncHandler(async (req, res) => send(res, await enrollmentService.saveLessonNote(req.user, req.body))),
+  notes: asyncHandler(async (req, res) => send(res, await enrollmentService.listLessonNotes(req.user, req.query.courseId))),
+  quiz: asyncHandler(async (req, res) => send(res, await enrollmentService.submitQuiz(req.user, req.body))),
+  assignment: asyncHandler(async (req, res) => send(res, await enrollmentService.submitAssignment(req.user, req.body), 201)),
+  certificate: asyncHandler(async (req, res) => send(res, await enrollmentService.issueCertificate(req.user, req.params.courseId), 201)),
+  certificates: asyncHandler(async (req, res) => send(res, await enrollmentService.myCertificates(req.user.id))),
   courseProgress: asyncHandler(async (req, res) => {
     const data = await enrollmentService.getCourseProgress(req.user, req.params.id);
     send(res, data);
@@ -186,6 +216,10 @@ const orderController = {
     const data = await orderService.getMyOrder(req.user.id, req.params.id);
     send(res, data);
   }),
+  cancel: asyncHandler(async (req, res) => {
+    const data = await orderService.cancel(req.user.id, req.params.id);
+    send(res, data);
+  }),
   list: asyncHandler(async (req, res) => {
     const data = await orderService.listOrders(req.query);
     send(res, data);
@@ -206,6 +240,25 @@ const orderController = {
     const data = await orderService.replayWebhookDelivery(req.user, req.params.id, req);
     send(res, data);
   }),
+  reconciliation: asyncHandler(async (req, res) => {
+    const data = await orderService.listReconciliationCases(req.query.limit);
+    send(res, data);
+  }),
+  retryReconciliation: asyncHandler(async (req, res) => {
+    const data = await orderService.retryReconciliation(req.user, req.params.id, req);
+    send(res, data);
+  }),
+  resolveDispute: asyncHandler(async (req, res) => {
+    const data = await orderService.resolveDispute(req.user, req.params.id, req);
+    send(res, data);
+  }),
+  bookmark: asyncHandler(async (req, res) => send(res, await enrollmentService.toggleBookmark(req.user, req.body))),
+  bookmarks: asyncHandler(async (req, res) => send(res, await enrollmentService.listBookmarks(req.user, req.query.courseId))),
+  saveNote: asyncHandler(async (req, res) => send(res, await enrollmentService.saveLessonNote(req.user, req.body))),
+  notes: asyncHandler(async (req, res) => send(res, await enrollmentService.listLessonNotes(req.user, req.query.courseId))),
+  quiz: asyncHandler(async (req, res) => send(res, await enrollmentService.submitQuiz(req.user, req.body))),
+  certificate: asyncHandler(async (req, res) => send(res, await enrollmentService.issueCertificate(req.user, req.params.courseId), 201)),
+  certificates: asyncHandler(async (req, res) => send(res, await enrollmentService.myCertificates(req.user.id))),
 };
 
 const reviewController = {

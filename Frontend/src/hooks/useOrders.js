@@ -18,7 +18,7 @@ export function useOrders({ pollOrderId = "", pollDurationMs = 120000 } = {}) {
 
           const orders = Array.isArray(query.state.data) ? query.state.data : [];
           const order = orders.find((item) => String(item?._id) === String(pollOrderId));
-          if (order && ["paid", "failed", "refunded"].includes(order.status)) return false;
+          if (order && ["paid", "failed", "refunded", "cancelled", "refund_pending", "disputed"].includes(order.status)) return false;
 
           return 3000;
         }
@@ -40,7 +40,7 @@ export function useOrderStatus(orderId, pollDurationMs = 120000) {
     enabled: Boolean(orderId),
     refetchInterval: (query) => {
       if (Date.now() - pollStartedAtRef.current >= pollDurationMs) return false;
-      if (["paid", "failed", "refunded"].includes(query.state.data?.status)) return false;
+      if (["paid", "failed", "refunded", "cancelled", "refund_pending", "disputed"].includes(query.state.data?.status)) return false;
       return 3000;
     },
     refetchIntervalInBackground: Boolean(orderId),
@@ -86,6 +86,37 @@ export function useReplayWebhook() {
   return useMutation({
     mutationFn: (id) => orderApi.replayWebhook(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["webhook-monitoring"] }),
+  });
+}
+
+export function useCancelOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => orderApi.cancel(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["order-status", id] });
+    },
+  });
+}
+
+export function useReconciliationCases(limit = 50) {
+  return useQuery({ queryKey: ["payment-reconciliation", limit], queryFn: () => orderApi.reconciliation(limit) });
+}
+
+export function useRetryReconciliation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => orderApi.retryReconciliation(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payment-reconciliation"] }),
+  });
+}
+
+export function useResolveDispute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => orderApi.resolveDispute(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payment-reconciliation"] }),
   });
 }
 

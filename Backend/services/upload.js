@@ -150,6 +150,9 @@ const uploadService = {
   },
 
   async initiateS3Multipart(actor, payload, request) {
+    if (!Number.isInteger(Number(payload.size)) || Number(payload.size) <= 0 || Number(payload.size) > config.s3MaxUploadBytes) {
+      throw new ApiError(400, `S3 uploads must be between 1 byte and ${Math.round(config.s3MaxUploadBytes / 1024 / 1024)} MB`);
+    }
     const folder = validateFileUpload(payload);
     assertFolderPermission(actor, folder);
     const upload = await initiateMultipartUpload({ ...payload, folder });
@@ -160,6 +163,8 @@ const uploadService = {
       key: upload.key,
       folder,
       contentType: payload.contentType,
+      fileName: payload.fileName,
+      size: Number(payload.size),
       expiresAt: new Date(Date.now() + config.s3MultipartSessionTtlHours * 60 * 60 * 1000),
     });
     await recordAudit({ actor, action: "upload.s3_multipart_started", resourceType: "upload", resourceId: upload.key, metadata: { uploadId: upload.uploadId, folder }, request });
@@ -197,6 +202,26 @@ const uploadService = {
     await upload.save();
     await recordAudit({ actor, action: "upload.s3_multipart_aborted", resourceType: "upload", resourceId: upload.key, metadata: { uploadId }, request });
     return result;
+  },
+
+  async cleanupExpiredS3MultipartUploads() {
+    const uploads = await MediaUpload.find({ provider: "s3", status: "initiated", expiresAt: { $lte: new Date() } }).limit(100);
+    let cleaned = 0;
+    for (const upload of uploads) {
+      try {
+        await abortMultipartUpload({ key: upload.key, uploadId: upload.uploadId });
+      } catch (error) {
+        if (!String(error?.name || "").includes("NoSuchUpload")) continue;
+      }
+      upload.status = "aborted";
+      await upload.save();
+      cleaned += 1;
+    }
+    return cleaned;
+  },
+
+  async cleanupStaleLocalUploads() {
+    return localVideoUpload.cleanupStaleUploads();
   },
 
   async startLocalVideoUpload(actor, payload, request) {

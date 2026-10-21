@@ -15,15 +15,17 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { CheckCircle2, CircleAlert, Plus, Trash2 } from "lucide-react";
 import { uploadApi } from "@/services/api";
 import { fileToDataUrl } from "@/utils/fileToDataUrl";
+import { useAuth } from "@/hooks/useAuth";
 
 const lessonSchema = z.object({
   _id: z.string().optional(),
   title: z.string().min(2),
-  type: z.enum(["video", "text", "pdf", "quiz"]),
+  type: z.enum(["video", "text", "pdf"]),
   content: z.string().optional(),
   videoUrl: z.string().optional(),
   fileUrl: z.string().optional(),
   fileKey: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
   duration: z.coerce.number().optional(),
   isPreview: z.boolean().optional(),
   order: z.coerce.number().optional(),
@@ -48,6 +50,8 @@ const schema = z.object({
   language: z.string().optional(),
   categoryId: z.string().optional(),
   tagsText: z.string().optional(),
+  seoTitle: z.string().max(180).optional(),
+  seoDescription: z.string().max(320).optional(),
   isPublished: z.boolean().optional(),
   isFeatured: z.boolean().optional(),
   maxSeats: z.preprocess((value) => (value === "" || value === undefined || value === null ? null : value), z.coerce.number().int().min(1).nullable()),
@@ -57,6 +61,8 @@ const schema = z.object({
 export function CourseEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const basePath = user?.role === "admin" ? "/creator" : "/instructor";
   const queryClient = useQueryClient();
   const isEdit = Boolean(id);
   const draftKey = `skillnest-course-draft:${id || "new"}`;
@@ -81,6 +87,8 @@ export function CourseEditor() {
       isPublished: false,
       isFeatured: false,
       maxSeats: null,
+      seoTitle: "",
+      seoDescription: "",
       sections: [],
       ...(savedDraft || {}),
     },
@@ -120,6 +128,8 @@ export function CourseEditor() {
         isPublished: false,
         isFeatured: false,
         maxSeats: null,
+        seoTitle: "",
+        seoDescription: "",
         sections: [],
         ...(readCourseDraft(draftKey) || {}),
       });
@@ -184,6 +194,8 @@ export function CourseEditor() {
         isPublished: Boolean(values.isPublished),
         isFeatured: Boolean(values.isFeatured),
         maxSeats: values.maxSeats === null ? null : Number(values.maxSeats),
+        seoTitle: values.seoTitle || "",
+        seoDescription: values.seoDescription || "",
       };
 
       const savedCourse = isEdit ? await courseApi.update(id, payload) : await courseApi.create(payload);
@@ -208,6 +220,7 @@ export function CourseEditor() {
               videoUrl: lesson.videoUrl || "",
               fileUrl: lesson.fileUrl || "",
               fileKey: lesson.fileKey || "",
+              thumbnailUrl: lesson.thumbnailUrl || "",
             duration: Number(lesson.duration || 0),
             isPreview: Boolean(lesson.isPreview),
             order: lesson.order || lessonIndex + 1,
@@ -224,7 +237,7 @@ export function CourseEditor() {
       await queryClient.invalidateQueries({ queryKey: ["courses"] });
       window.localStorage.removeItem(draftKey);
       toast.success(isEdit ? "Course updated" : "Course created");
-      navigate("/instructor/courses");
+      navigate(`${basePath}/courses`);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
@@ -297,6 +310,12 @@ export function CourseEditor() {
                 <Input {...editorForm.register("tagsText")} placeholder="react, frontend, web" />
               </Field>
             </div>
+            <Field label="SEO title">
+              <Input {...editorForm.register("seoTitle")} placeholder="Search-friendly course title" />
+            </Field>
+            <Field label="SEO description">
+              <Textarea rows={3} {...editorForm.register("seoDescription")} placeholder="Search-friendly course summary" />
+            </Field>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm">
@@ -331,6 +350,7 @@ export function CourseEditor() {
                   setValue={editorForm.setValue}
                   control={editorForm.control}
                   removeSection={() => sectionsArray.remove(sectionIndex)}
+                  moveSection={sectionsArray.move}
                 />
               ))
             )}
@@ -358,12 +378,22 @@ export function CourseEditor() {
   );
 }
 
-function SectionEditor({ sectionIndex, control, register, setValue, removeSection }) {
+function SectionEditor({ sectionIndex, control, register, setValue, removeSection, moveSection }) {
   const name = `sections.${sectionIndex}`;
   const lessonsArray = useFieldArray({ control, name: `${name}.lessons` });
 
   return (
-    <Card className="space-y-4 border-slate-200 p-5">
+    <Card
+      draggable
+      onDragStart={(event) => event.dataTransfer.setData("text/course-section", String(sectionIndex))}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        const from = Number(event.dataTransfer.getData("text/course-section"));
+        if (Number.isInteger(from) && from !== sectionIndex) moveSection(from, sectionIndex);
+      }}
+      className="space-y-4 border-slate-200 p-5"
+    >
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold text-slate-950">Section {sectionIndex + 1}</h3>
         <Button type="button" variant="ghost" onClick={removeSection}>
@@ -407,8 +437,18 @@ function SectionEditor({ sectionIndex, control, register, setValue, removeSectio
           <p className="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">Add a lesson to this section.</p>
         ) : (
           lessonsArray.fields.map((lessonField, lessonIndex) => (
-            <LessonEditor
+            <div
               key={lessonField.id}
+              draggable
+              onDragStart={(event) => event.dataTransfer.setData("text/course-lesson", String(lessonIndex))}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                const from = Number(event.dataTransfer.getData("text/course-lesson"));
+                if (Number.isInteger(from) && from !== lessonIndex) lessonsArray.move(from, lessonIndex);
+              }}
+            >
+            <LessonEditor
               sectionName={name}
               lessonIndex={lessonIndex}
               control={control}
@@ -416,6 +456,7 @@ function SectionEditor({ sectionIndex, control, register, setValue, removeSectio
               setValue={setValue}
               removeLesson={() => lessonsArray.remove(lessonIndex)}
             />
+            </div>
           ))
         )}
       </div>
@@ -469,6 +510,13 @@ function LessonEditor({ sectionName, lessonIndex, control, register, setValue, r
       setValue(`${name}.videoUrl`, upload.fileUrl, { shouldDirty: true, shouldValidate: true });
       setValue(`${name}.fileKey`, upload.fileKey, { shouldDirty: true, shouldValidate: true });
       setValue(`${name}.duration`, durationMinutes, { shouldDirty: true, shouldValidate: true });
+      try {
+        const thumbnailDataUrl = await generateVideoThumbnail(file);
+        const thumbnail = await uploadApi.uploadImage({ dataUrl: thumbnailDataUrl, folder: "courseThumbnails", publicId: `lesson-thumbnail-${Date.now()}` });
+        setValue(`${name}.thumbnailUrl`, thumbnail.url || "", { shouldDirty: true, shouldValidate: true });
+      } catch {
+        toast.info("Video uploaded, but thumbnail generation was unavailable.");
+      }
       toast.success("Video uploaded");
     } catch (error) {
       toast.error(getApiErrorMessage(error));
@@ -522,7 +570,6 @@ function LessonEditor({ sectionName, lessonIndex, control, register, setValue, r
               <option value="video">Video</option>
               <option value="text">Text</option>
               <option value="pdf">PDF</option>
-              <option value="quiz">Quiz</option>
             </Select>
           )}
         </Field>
@@ -648,6 +695,36 @@ function getVideoDurationInMinutes(file) {
   });
 }
 
+function generateVideoThumbnail(file) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const objectUrl = URL.createObjectURL(file);
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      video.remove();
+    };
+    video.muted = true;
+    video.preload = "metadata";
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(1, Number(video.duration) || 1);
+    };
+    video.onseeked = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 640;
+      canvas.height = Math.max(360, Math.round((video.videoHeight / video.videoWidth) * canvas.width) || 360);
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+      cleanup();
+      resolve(dataUrl);
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Video thumbnail generation failed"));
+    };
+    video.src = objectUrl;
+  });
+}
+
 function getUploadedFileName(fileKey) {
   const value = String(fileKey || "").split("/").pop() || "";
   return value.replace(/^\d+-[a-f0-9]+-/i, "") || value;
@@ -687,6 +764,7 @@ async function loadCourse(courseId, form) {
         videoUrl: lesson.videoUrl || "",
         fileUrl: lesson.fileUrl || "",
         fileKey: lesson.fileKey || "",
+        thumbnailUrl: lesson.thumbnailUrl || "",
         duration: lesson.duration || 0,
         isPreview: Boolean(lesson.isPreview),
         order: lesson.order || lessonIndex + 1,
@@ -708,6 +786,8 @@ async function loadCourse(courseId, form) {
     isPublished: Boolean(course.course.isPublished),
     isFeatured: Boolean(course.course.isFeatured),
     maxSeats: course.course.maxSeats ?? null,
+    seoTitle: course.course.seoTitle || "",
+    seoDescription: course.course.seoDescription || "",
     sections,
   };
   const draft = readCourseDraft(`skillnest-course-draft:${courseId}`);

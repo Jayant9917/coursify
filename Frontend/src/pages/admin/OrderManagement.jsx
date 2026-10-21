@@ -1,4 +1,4 @@
-import { useAdminOrders, useAdminOrderDetails, useAdminRefundOrder, useReplayWebhook, useWebhookMonitoring } from "@/hooks/useOrders";
+import { useAdminOrders, useAdminOrderDetails, useAdminRefundOrder, useReplayWebhook, useWebhookMonitoring, useReconciliationCases, useRetryReconciliation, useResolveDispute } from "@/hooks/useOrders";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Card, Badge, Button } from "@/components/ui";
@@ -17,6 +17,9 @@ export function OrderManagement() {
   const refundOrder = useAdminRefundOrder();
   const webhookQuery = useWebhookMonitoring(20);
   const replayWebhook = useReplayWebhook();
+  const reconciliationQuery = useReconciliationCases(20);
+  const retryReconciliation = useRetryReconciliation();
+  const resolveDispute = useResolveDispute();
 
   if (ordersQuery.isLoading) return <LoadingSpinner />;
   if (ordersQuery.isError) return <ErrorState description="We could not load orders." onRetry={() => ordersQuery.refetch()} />;
@@ -24,10 +27,10 @@ export function OrderManagement() {
   const orders = ordersQuery.data?.data || ordersQuery.data || [];
 
   const recordRefund = async (order) => {
-    if (!window.confirm("Record this paid order as refunded and revoke course access?")) return;
+    if (!window.confirm("Issue a provider refund for this paid order and revoke course access?")) return;
     try {
       await refundOrder.mutateAsync(order._id);
-      toast.success("Refund recorded and course access revoked");
+      toast.success("Refund issued and course access revoked");
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
@@ -39,6 +42,27 @@ export function OrderManagement() {
       await replayWebhook.mutateAsync(delivery._id);
       toast.success("Webhook replayed");
       await Promise.all([ordersQuery.refetch(), webhookQuery.refetch()]);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  };
+
+  const retryCase = async (item) => {
+    try {
+      await retryReconciliation.mutateAsync(item._id);
+      toast.success("Payment reconciliation completed");
+      await Promise.all([reconciliationQuery.refetch(), ordersQuery.refetch()]);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
+  };
+
+  const restoreDisputeAccess = async (item) => {
+    if (!window.confirm("Confirm the provider resolved this dispute and restore course access?")) return;
+    try {
+      await resolveDispute.mutateAsync(item._id);
+      toast.success("Dispute resolved and access restored");
+      await Promise.all([reconciliationQuery.refetch(), ordersQuery.refetch()]);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
@@ -96,6 +120,26 @@ export function OrderManagement() {
         )}
       </Card>
 
+      <Card className="p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-bold">Payment reconciliation</h2>
+            <p className="text-sm text-slate-500">Cases where payment, enrollment, or refund processing needs a safe retry.</p>
+          </div>
+          <Button variant="outline" onClick={() => reconciliationQuery.refetch()}>Refresh</Button>
+        </div>
+        {reconciliationQuery.isLoading ? <p className="mt-4 text-sm text-slate-500">Loading reconciliation cases...</p> : (reconciliationQuery.data || []).length === 0 ? <p className="mt-4 text-sm text-slate-500">No open reconciliation cases.</p> : (
+          <div className="mt-4 space-y-3">
+            {(reconciliationQuery.data || []).map((item) => (
+              <div key={item._id} className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div><p className="font-medium text-slate-950">{item.issue.replaceAll("_", " ")}</p><p className="text-xs text-slate-500">Order {String(item.orderId).slice(-6)} · Attempts {item.attempts || 0} · {item.lastError || "Needs review"}</p></div>
+                {item.issue === "dispute_review" ? <Button size="sm" variant="outline" onClick={() => restoreDisputeAccess(item)} disabled={resolveDispute.isPending}>Restore access</Button> : <Button size="sm" variant="outline" onClick={() => retryCase(item)} disabled={retryReconciliation.isPending}>Retry</Button>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
       {orders.length === 0 ? (
         <EmptyState title="No orders found" description="Order records will appear here." />
       ) : (
@@ -110,7 +154,7 @@ export function OrderManagement() {
                 <div className="flex items-center gap-2">
                   <Badge variant={order.status === "paid" ? "success" : "secondary"}>{order.status}</Badge>
                   <Button variant="outline" onClick={() => setSelectedOrderId(order._id)}>Details</Button>
-                  {order.status === "paid" ? <Button variant="outline" onClick={() => recordRefund(order)}>Record refund</Button> : null}
+                  {order.status === "paid" ? <Button variant="outline" onClick={() => recordRefund(order)}>Issue refund</Button> : null}
                   <Badge variant="outline">₹{order.amount}</Badge>
                 </div>
               </div>

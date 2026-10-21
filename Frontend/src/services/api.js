@@ -271,6 +271,26 @@ export const courseApi = {
     const response = await api.get("/courses/instructor/me", { params: query });
     return unwrap(response);
   },
+  async requestReview(id) {
+    const response = await api.post(`/courses/${id}/request-review`);
+    return unwrap(response);
+  },
+  async review(id, payload) {
+    const response = await api.post(`/courses/admin/${id}/review`, payload);
+    return unwrap(response);
+  },
+  async restore(id) {
+    const response = await api.post(`/courses/admin/${id}/restore`);
+    return unwrap(response);
+  },
+  async duplicate(id) {
+    const response = await api.post(`/courses/${id}/duplicate`);
+    return unwrap(response);
+  },
+  async versions(id) {
+    const response = await api.get(`/courses/${id}/versions`);
+    return unwrap(response);
+  },
   async instructorDetails(id) {
     const response = await api.get(`/courses/instructor/${id}`);
     return unwrap(response);
@@ -356,6 +376,38 @@ export const enrollmentApi = {
     const response = await api.get(`/courses/${courseId}/progress`);
     return unwrap(response);
   },
+  async toggleBookmark(payload) {
+    const response = await api.post("/enrollments/bookmarks", payload);
+    return unwrap(response);
+  },
+  async listBookmarks(courseId) {
+    const response = await api.get("/enrollments/bookmarks", { params: courseId ? { courseId } : {} });
+    return unwrap(response);
+  },
+  async saveLessonNote(payload) {
+    const response = await api.put("/enrollments/notes", payload);
+    return unwrap(response);
+  },
+  async listLessonNotes(courseId) {
+    const response = await api.get("/enrollments/notes", { params: courseId ? { courseId } : {} });
+    return unwrap(response);
+  },
+  async submitQuiz(payload) {
+    const response = await api.post("/enrollments/quiz", payload);
+    return unwrap(response);
+  },
+  async submitAssignment(payload) {
+    const response = await api.post("/enrollments/assignments", payload);
+    return unwrap(response);
+  },
+  async issueCertificate(courseId) {
+    const response = await api.post(`/enrollments/certificates/${courseId}`);
+    return unwrap(response);
+  },
+  async certificates() {
+    const response = await api.get("/enrollments/certificates");
+    return unwrap(response);
+  },
 };
 
 export const orderApi = {
@@ -378,6 +430,10 @@ export const orderApi = {
     const response = await api.get(`/orders/${id}/status`);
     return unwrap(response);
   },
+  async cancel(id) {
+    const response = await api.post(`/orders/${id}/cancel`);
+    return unwrap(response);
+  },
   async list(query = {}) {
     const response = await api.get("/orders", { params: query });
     return unwrap(response);
@@ -396,6 +452,18 @@ export const orderApi = {
   },
   async replayWebhook(id) {
     const response = await api.post(`/orders/webhook-monitoring/${id}/replay`);
+    return unwrap(response);
+  },
+  async reconciliation(limit = 50) {
+    const response = await api.get("/orders/reconciliation", { params: { limit } });
+    return unwrap(response);
+  },
+  async retryReconciliation(id) {
+    const response = await api.post(`/orders/reconciliation/${id}/retry`);
+    return unwrap(response);
+  },
+  async resolveDispute(id) {
+    const response = await api.post(`/orders/reconciliation/${id}/resolve-dispute`);
     return unwrap(response);
   },
 };
@@ -620,6 +688,7 @@ export const uploadApi = {
       session = await unwrap(await api.post("/uploads/s3-multipart/initiate", {
         fileName: file.name,
         contentType: file.type,
+        size: file.size,
         folder,
       }));
       session.parts = [];

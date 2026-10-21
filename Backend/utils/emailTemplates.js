@@ -57,4 +57,16 @@ function PasswordResetEmail({ resetUrl, logoUrl }) {
   );
 }
 
-module.exports = { PasswordResetEmail };
+function PaymentNotificationEmail({ title, message, orderId, actionUrl = "", actionLabel = "View dashboard", logoUrl }) {
+  return h(
+    EmailShell,
+    { preview: title, logoUrl },
+    h(Text, { style: baseStyles.eyebrow }, "Skillnest payments"),
+    h(Heading, { style: { color: "#172019", fontSize: "30px", lineHeight: "1.15", margin: "12px 0 16px" } }, title),
+    h(Text, { style: baseStyles.text }, message),
+    orderId ? h(Text, { style: baseStyles.text }, `Order: ${orderId}`) : null,
+    actionUrl ? h(Section, { style: { margin: "28px 0" } }, h(Button, { href: actionUrl, style: baseStyles.button }, actionLabel)) : null,
+  );
+}
+
+module.exports = { PasswordResetEmail, PaymentNotificationEmail };
